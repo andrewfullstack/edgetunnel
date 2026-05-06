@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    name: Build and publish _worker.js
+    name: Build and publish artefacts
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -46,9 +46,14 @@ jobs:
             exit 1
           fi
 
+      - name: Package edgetunnel.zip (drop-in for the CF Pages upload flow)
+        run: zip -j edgetunnel.zip _worker.js
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: _worker.js
+          files: |
+            _worker.js
+            edgetunnel.zip
           generate_release_notes: true
           fail_on_unmatched_files: true

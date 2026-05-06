@@ -50,15 +50,18 @@ The most reliable path — the Workers dashboard's "paste-deploy" can
 mis-classify the project as static-assets-only and refuse to let you add
 environment variables. Pages doesn't have that problem.
 
-1. **Get a zip with `_worker.js`.** Three equivalent options:
-   - **Minimal (recommended)**: build a one-file zip yourself:
-     `zip main.zip _worker.js` (~80 KB). Smallest, fastest upload.
-   - **Release artefact**: download `_worker.js` from the
+1. **Get a zip with `_worker.js`.** Three equivalent options, in order of preference:
+   - **Release `edgetunnel.zip` (recommended)**: download from the
      [Releases page](https://github.com/andrewfullstack/edgetunnel/releases)
-     of this fork (when a tag has been cut), then `zip main.zip _worker.js`.
-   - **Auto-zip of the repo**: download the [auto-generated `main.zip`](https://github.com/andrewfullstack/edgetunnel/archive/refs/heads/main.zip)
-     of *this fork*. Contains the whole repo (~MB-scale); Pages uses
-     `_worker.js` and ignores everything else. **Don't use the upstream
+     of this fork. Each tagged release publishes `edgetunnel.zip`
+     containing just the built `_worker.js` (~80 KB). One click, ready
+     to upload.
+   - **Build it locally**: `npm run build && zip edgetunnel.zip _worker.js`
+     (~80 KB). Equivalent to what the release workflow ships.
+   - **Auto-zip of the repo**: the [auto-generated `main.zip`](https://github.com/andrewfullstack/edgetunnel/archive/refs/heads/main.zip)
+     (named `main.zip` by GitHub after the branch name) contains the
+     whole repo (~MB-scale); Pages uses `_worker.js` and ignores
+     everything else. Works but wasteful. **Don't use the upstream
      `cmliu/edgetunnel` zip — its `_worker.js` is the original
      pre-refactor 4619-line file, not what this fork's docs describe.**
 2. **Pages dashboard → Create → Pages tab → Upload assets** → name the
