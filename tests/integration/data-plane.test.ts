@@ -22,6 +22,10 @@ import { unstable_dev, type Unstable_DevWorker } from 'wrangler';
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import * as net from 'node:net';
+// Node's built-in WebSocket is only stable from 22+; CI runs Node 20.
+// Use the `ws` package for a constructor that works on every supported
+// Node version.
+import WebSocket from 'ws';
 
 const ADMIN_PASSWORD = 'data-plane-test-pw';
 const DEFAULT_ENCRYPT_KEY = '勿动此默认密钥，有需求请自行通过添加变量KEY进行修改';
@@ -129,8 +133,7 @@ async function vlessRoundTrip(
   timeoutMs = 5000
 ): Promise<{ data: Uint8Array; closed: boolean }> {
   const url = `ws://${worker.address}:${worker.port}/`;
-  // Node 21+ has a global WebSocket; vitest in node mode picks it up.
-  const ws = new (globalThis as any).WebSocket(url);
+  const ws = new WebSocket(url);
   ws.binaryType = 'arraybuffer';
 
   const received: Uint8Array[] = [];
@@ -138,18 +141,22 @@ async function vlessRoundTrip(
   let closed = false;
 
   await new Promise<void>((resolve, reject) => {
-    const onOpen = () => resolve();
-    const onErr = (e: any) => reject(new Error(`ws open failed: ${e?.message || e}`));
-    ws.addEventListener('open', onOpen, { once: true });
-    ws.addEventListener('error', onErr, { once: true });
+    ws.once('open', () => resolve());
+    ws.once('error', (e: any) =>
+      reject(new Error(`ws open failed: ${e?.message || e}`))
+    );
   });
 
   const done = new Promise<void>((resolve) => {
     const timer = setTimeout(() => resolve(), timeoutMs);
-    ws.addEventListener('message', (event: any) => {
-      const buf = event.data instanceof ArrayBuffer
-        ? new Uint8Array(event.data)
-        : new Uint8Array(event.data);
+    ws.on('message', (data: Buffer | ArrayBuffer | Buffer[]) => {
+      // ws delivers a node Buffer by default for binary frames.
+      const buf =
+        data instanceof Buffer
+          ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+          : data instanceof ArrayBuffer
+            ? new Uint8Array(data)
+            : new Uint8Array(Buffer.concat(data as Buffer[]));
       received.push(buf);
       total += buf.byteLength;
       if (total >= expectedBytes) {
@@ -157,7 +164,7 @@ async function vlessRoundTrip(
         resolve();
       }
     });
-    ws.addEventListener('close', () => {
+    ws.on('close', () => {
       closed = true;
       clearTimeout(timer);
       resolve();
