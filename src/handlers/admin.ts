@@ -203,7 +203,22 @@ export async function handleAdmin(
 
   // GET endpoints
   if (caseInsensitivePath === 'admin/config.json') {
-    return json(config);
+    const issueCount = Array.isArray(config.__validation?.issues)
+      ? config.__validation.issues.length
+      : 0;
+    return new Response(JSON.stringify(config, null, 2), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json;charset=utf-8',
+        'X-Config-Validation-Issues': String(issueCount),
+      },
+    });
+  }
+  // Dedicated endpoint for admin UIs / monitoring tools that just want
+  // to know whether the stored config is structurally valid.
+  if (caseInsensitivePath === 'admin/validation.json') {
+    const issues: any[] = config.__validation?.issues ?? [];
+    return json({ ok: issues.length === 0, count: issues.length, issues });
   }
   if (casePreservingPath === 'admin/ADD.txt') {
     let customIPs = (await env.KV.get('ADD.txt')) || 'null';
@@ -213,7 +228,7 @@ export async function handleAdmin(
           request as any,
           config.preferredSub.localIP.count,
           config.preferredSub.localIP.port,
-          config.protocol === 'ss' ? config.SS.TLS : true
+          true
         )
       )[1];
     }

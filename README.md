@@ -140,7 +140,8 @@ The hope is to lower the maintenance bar for this excellent project so that more
 
 > 项目已重构为模块化 TypeScript。`_worker.js` 现在是 **esbuild 打包+压缩产物**（约 77 KB，VLESS-only），由 `src/**/*.ts` 构建生成。原始单文件保存在初始提交里（`git show <initial-commit>:_worker.original.js`），需要 diff 时随时可取。
 >
-> 详细结构、Schema 迁移说明、改名映射见 [`REFACTORING.md`](./REFACTORING.md)。
+> Architecture, schema migration, and rename map: see [`REFACTORING.md`](./REFACTORING.md).
+> Platform limits ("why no Hysteria2 / REALITY / multi-tenant", account-suspension risk, etc.): see [`docs/PLATFORM_LIMITS.md`](./docs/PLATFORM_LIMITS.md).
 
 ### 环境要求
 

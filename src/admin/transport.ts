@@ -1,5 +1,5 @@
 // Helpers for converting subscription-config "transport" choices into
-// the field names / values that go into VLESS / Trojan URIs.
+// the field names / values that go into VLESS URIs.
 
 import { randomPath } from '../utils/path.js';
 

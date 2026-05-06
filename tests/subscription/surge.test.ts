@@ -16,47 +16,19 @@ describe('patchSurgeSubscription', () => {
     expect(output).toContain('interval=21600');
   });
 
-  it('injects ws=true and ws-path for trojan lines without ws config', () => {
-    const input =
-      '[General]\n' +
-      'NodeA = trojan, host.example.com, 443, password=abc, sni=host.example.com, skip-cert-verify=false\n';
-    const output = patchSurgeSubscription(input, 'https://x.com/sub', {
-      skipCertVerify: false,
-      fullNodePath: '/proxy',
-      randomPath: false,
-    });
-    expect(output).toContain('ws=true');
-    expect(output).toContain('ws-path=/proxy');
-    expect(output).toContain('ws-headers=Host:"host.example.com"');
-  });
-
-  it('does not double-patch lines that already have ws=true', () => {
-    const input =
-      '[General]\n' +
-      'NodeA = trojan, host.example.com, 443, password=abc, sni=host.example.com, ' +
-      'ws=true, ws-path=/p, ws-headers=Host:"host.example.com"\n';
-    const output = patchSurgeSubscription(input, 'https://x.com/sub', {
-      skipCertVerify: false,
-      fullNodePath: '/p',
-    });
-    expect(output).toContain('NodeA = trojan, host.example.com, 443');
-    expect((output.match(/ws=true/g) || []).length).toBe(1);
-  });
-
-  it('preserves non-trojan lines as-is', () => {
+  it('replaces the first line and preserves the rest of the body', () => {
+    // Matches original behaviour: header overwrites first line, remainder kept.
     const input = '[General]\n[Rule]\nDOMAIN-SUFFIX,google.com,Proxy\n';
     const output = patchSurgeSubscription(input, 'https://x.com/sub', {});
+    expect(output).toMatch(/^#!MANAGED-CONFIG/);
+    expect(output).toContain('[Rule]');
     expect(output).toContain('DOMAIN-SUFFIX,google.com,Proxy');
   });
 
   it('handles CRLF line endings', () => {
-    const input =
-      '[General]\r\n' +
-      'NodeA = trojan, host.example.com, 443, password=abc, sni=host.example.com, skip-cert-verify=false\r\n';
-    const output = patchSurgeSubscription(input, 'https://x.com/sub', {
-      skipCertVerify: false,
-      fullNodePath: '/proxy',
-    });
-    expect(output).toContain('ws=true');
+    const input = '[General]\r\nfoo = direct\r\n';
+    const output = patchSurgeSubscription(input, 'https://x.com/sub', {});
+    expect(output).toMatch(/^#!MANAGED-CONFIG/);
+    expect(output).toContain('foo = direct');
   });
 });

@@ -87,6 +87,13 @@ describe('routing surface (real workerd)', () => {
     expect(res.headers.get('location')).toBe('/login');
   });
 
+  it('GET /admin/validation.json without auth cookie redirects to /login', async () => {
+    // Validation endpoint is gated like the rest of /admin/*
+    const res = await worker.fetch('/admin/validation.json', { redirect: 'manual' });
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/login');
+  });
+
   it('GET / falls through to disguise page (does not 500)', async () => {
     const res = await worker.fetch('/', { redirect: 'manual' });
     // Without env.URL, falls through to nginx welcome page (status 200)

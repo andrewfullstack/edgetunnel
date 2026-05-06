@@ -1,144 +1,160 @@
-# EdgeTunnel 重构总结
+# EdgeTunnel Refactor Notes
 
-把上游单文件 `_worker.js`（4619 行）拆分成模块化 TypeScript 项目，移除所有中文标识符，保留行为完全一致的部署产物。
+This document explains why the upstream `cmliu/edgetunnel` was forked, what
+the refactor changed, and what contributors should know before editing the
+code. Translation of this doc to English is part of the fork's stated goal
+of lowering the contribution barrier — it used to be Chinese-only.
 
-## Why This Refactor
+## Why this fork
 
-[The upstream project `cmliu/edgetunnel`](https://github.com/cmliu/edgetunnel) is a brilliant Cloudflare Workers edge-proxy implementation — **a great idea, but very hard to maintain**:
+[The upstream project `cmliu/edgetunnel`](https://github.com/cmliu/edgetunnel)
+is a brilliant Cloudflare Workers edge-proxy implementation — **a great
+idea, but very hard to maintain**:
 
-- All logic is crammed into a single 4619-line `_worker.js` file
-- Variables and functions are heavily named in Chinese identifiers
+- All logic crammed into a single 4619-line `_worker.js` file
+- Variables, functions, fields named in Chinese identifiers
 - Zero TypeScript types
 - Zero test coverage
 
-This organization makes it extremely hard for anyone to fix a bug, add a small feature, or even **figure out what a block of code is doing**. As a result, the project is effectively maintained by the original author alone, and the contribution barrier is high.
+Net effect: the contribution barrier is high, the project is effectively
+maintained by one person, and even reading the code is hard. The goal of
+this refactor is simple — **make the project something anyone can read,
+modify, and contribute to** — while preserving runtime behaviour and the
+deployment shape so existing users can upgrade seamlessly.
 
-The goal of this refactor is simple: **make the project something anyone can read, modify, and contribute to** — lower the maintenance bar so that more people can get involved, while preserving runtime behaviour and deployment shape exactly so existing users can upgrade seamlessly.
-
-## 当前状态：100% 完成 ✅
+## Current status
 
 ```
-源码模块            51 个 .ts 文件
-测试模块            24 个 .ts 文件
-测试通过            227 / 227
-TypeScript 错误     0
-构建产物            _worker.js (232 KB, esbuild bundled)
-对比原始单文件      git show <initial-commit>:_worker.original.js
+Source modules           37 .ts files (~7400 lines)
+Test modules             16 .ts files
+Tests                    173 unit + 6 integration (workerd via wrangler unstable_dev)
+TypeScript errors        0
+Bundle artefact          _worker.js  ~77 KB (esbuild minified, VLESS-only)
+Original single file     git show <initial-commit>:_worker.original.js
 ```
+
+Common scripts:
 
 ```bash
-npm install      # 安装依赖
-npm run lint     # tsc --noEmit
-npm test         # vitest run（24 个文件、227 个测试）
-npm run build    # esbuild → _worker.js
-npm run deploy   # build + wrangler deploy
+npm install            # install deps
+npm run lint           # tsc --noEmit
+npm test               # vitest run (unit tests)
+npm run test:integration  # build + run integration tests in workerd
+npm run build          # esbuild → _worker.js
+npm run analyze        # per-module bundle size breakdown
+npm run deploy         # build + wrangler deploy
 ```
 
-## 项目结构
+## Project layout
 
 ```
 edgetunnel/
-├── _worker.js                   ← 构建产物（被 npm run build 覆盖；原始单文件 _worker.original.js 已从工作树移除，保存在初始提交里）
-├── package.json                 ← 依赖 + 脚本
-├── tsconfig.json                ← TypeScript 配置
-├── build.mjs                    ← esbuild 入口
-├── vitest.config.ts             ← 测试配置
-├── wrangler.toml                ← 部署配置
-├── REFACTORING.md               ← 本文档
+├── _worker.js                   ← build artefact (overwritten by `npm run build`;
+│                                  the original single-file source lives in the
+│                                  initial commit, not the working tree)
+├── package.json                 ← deps + scripts
+├── package-lock.json            ← committed for reproducible CI builds
+├── tsconfig.json                ← TypeScript config
+├── build.mjs                    ← esbuild entry
+├── build-analyze.mjs            ← `npm run analyze` (esbuild metafile)
+├── vitest.config.ts             ← unit-test config (excludes integration)
+├── vitest.config.integration.ts ← integration-test config (workerd)
+├── wrangler.toml                ← deployment config
+├── REFACTORING.md               ← this document
+├── .github/workflows/
+│   ├── ci.yml                   ← lint + test + build + drift check on every push
+│   └── release.yml              ← publishes _worker.js to Releases on tag push
 ├── src/
-│   ├── index.ts                 ← 主 fetch handler（路由分发）
-│   ├── constants.ts             ← TLS / SS 协议常量
-│   ├── state.ts                 ← ProxyContext（替代模块全局变量）
-│   ├── crypto/                  (10) 加密层
-│   │   ├── aes-gcm.ts                ← Web Crypto AES-GCM 包装
-│   │   ├── chacha20.ts               ← ChaCha20 流密码（手写）
-│   │   ├── chacha20-poly1305.ts      ← AEAD（手写，RFC 8439）
-│   │   ├── ecdh.ts                   ← X25519 / P-256 ECDH
-│   │   ├── hmac-hkdf.ts              ← HMAC + HKDF + TLS 1.2 PRF
-│   │   ├── md5.ts                    ← md5x2 + UUID 格式化
-│   │   ├── poly1305.ts               ← Poly1305 MAC（手写）
-│   │   ├── sha224.ts                 ← SHA-224（Trojan 鉴权用）
-│   │   ├── tls-record.ts             ← TLS 记录/握手解析器 + AEAD 辅助
-│   │   ├── tls-messages.ts           ← ClientHello/ServerHello/etc 解析+构造
-│   │   └── tls-client.ts             ← TlsClient 类（TLS 1.2/1.3 客户端）
-│   ├── protocols/               (4) 协议解析
-│   │   ├── dispatch.ts               ← 缓冲式协议探测（XHTTP/gRPC）
-│   │   ├── shadowsocks.ts            ← SS AEAD 派生 + 加解密
-│   │   ├── trojan.ts                 ← Trojan 帧解析
-│   │   └── vless.ts                  ← VLESS 帧解析
-│   ├── transports/              (8) 传输层
-│   │   ├── byob-stream.ts            ← BYOB 流式优化
-│   │   ├── direct.ts                 ← forwardTcp + connectDirect 主转发
-│   │   ├── http-connect.ts           ← HTTP CONNECT 隧道
-│   │   ├── https-proxy.ts            ← TLS 包装的代理 (含 ChaCha 回退)
-│   │   ├── socket-utils.ts           ← close/wsSend/waitConnect
-│   │   ├── socks5.ts                 ← SOCKS5 客户端
-│   │   ├── tls-wrap.ts               ← TlsClient → 套接字接口包装
-│   │   └── udp.ts                    ← DNS UDP + Trojan UDP 帧
-│   ├── handlers/                (7) HTTP 处理器
-│   │   ├── admin.ts                  ← /admin/* 路由 (KV CRUD)
-│   │   ├── grpc.ts                   ← gRPC 数据面
-│   │   ├── login.ts                  ← /login + cookie 验证
-│   │   ├── ss-inbound.ts             ← SS 入站 AEAD 状态机
-│   │   ├── sub.ts                    ← /sub 订阅生成主逻辑
-│   │   ├── websocket.ts              ← 主数据面
-│   │   └── xhttp.ts                  ← XHTTP 数据面
-│   ├── subscription/            (3) 订阅热补丁
-│   │   ├── clash.ts                  ← Clash YAML 补丁
-│   │   ├── singbox.ts                ← Sing-box JSON schema 迁移
-│   │   └── surge.ts                  ← Surge 配置补丁
-│   ├── admin/                   (8) 管理工具
-│   │   ├── cloudflare-api.ts         ← Cloudflare GraphQL 用量
-│   │   ├── config.ts                 ← readConfigJson + 旧 schema 迁移
-│   │   ├── pages.ts                  ← nginx() / html1101() 伪装页
-│   │   ├── parse-address.ts          ← 反代 IP 解析+缓存+确定性洗牌
-│   │   ├── preferred-sub.ts          ← 优选 IP API + 多编码 CSV 解析
-│   │   ├── proxy-resolver.ts         ← parseSocks5Auth + parseProxyParams
-│   │   ├── random-ip.ts              ← ISP-aware 随机 IP 生成
-│   │   └── transport.ts              ← transport 配置 helpers
-│   └── utils/                   (7) 工具
-│       ├── bytes.ts                  ← 字节工具
-│       ├── dns.ts                    ← DoH + ECH 提取
-│       ├── hostname.ts               ← IP/host 工具
-│       ├── log.ts                    ← 访问日志 + TG 推送
-│       ├── logger.ts                 ← 调试日志
-│       ├── path.ts                   ← randomPath / replaceAsterisks / bulkReplaceDomains
-│       └── url.ts                    ← normalizeRequestUrl / toArray
-└── tests/                       ← Vitest 测试套件（24 个文件，227 个测试）
-    ├── crypto/         8 个文件 / 88 测试   含 RFC 8439 + FIPS 180-4 标准向量
-    ├── protocols/      3 个文件 / 35 测试   VLESS/Trojan/Dispatch 边界覆盖
-    ├── transports/     4 个文件 / 32 测试   socket-utils/tls-wrap/udp/byob
-    ├── handlers/       1 个文件 /  9 测试   SS 入站状态机
-    ├── subscription/   1 个文件 /  6 测试   Surge 补丁
-    ├── admin/          3 个文件 / 30 测试   proxy-resolver/transport/random-ip
-    └── utils/          4 个文件 / 50 测试   bytes/url/hostname/path/log
+│   ├── index.ts                 ← main fetch handler (route dispatch)
+│   ├── constants.ts             ← protocol-layer constants
+│   ├── state.ts                 ← ProxyContext (replaces module-level globals)
+│   ├── crypto/                  ← only md5.ts remains; the hand-rolled TLS
+│   │                              client + cipher suites were removed when
+│   │                              the HTTPS upstream proxy mode was dropped
+│   ├── protocols/
+│   │   ├── dispatch.ts          ← buffered VLESS first-packet probe
+│   │   │                          (used by XHTTP/gRPC paths)
+│   │   └── vless.ts             ← VLESS frame parser
+│   ├── transports/
+│   │   ├── byob-stream.ts       ← BYOB stream optimisation
+│   │   ├── direct.ts            ← forwardTcp + connectDirect (main forwarder)
+│   │   ├── http-connect.ts      ← HTTP CONNECT tunnel
+│   │   ├── socket-utils.ts      ← close / wsSend / waitConnect helpers
+│   │   ├── socks5.ts            ← SOCKS5 client
+│   │   └── udp.ts               ← DNS-over-TCP (Workers can't do real UDP)
+│   ├── handlers/
+│   │   ├── admin.ts             ← /admin/* routes (KV CRUD + status)
+│   │   ├── grpc.ts              ← gRPC data plane
+│   │   ├── login.ts             ← /login + cookie verification
+│   │   ├── sub.ts               ← /sub subscription generation
+│   │   ├── websocket.ts         ← primary WebSocket data plane
+│   │   └── xhttp.ts             ← XHTTP data plane
+│   ├── subscription/
+│   │   ├── clash.ts             ← Clash YAML patcher
+│   │   ├── singbox.ts           ← Sing-box JSON schema migrator
+│   │   └── surge.ts             ← Surge MANAGED-CONFIG header injector
+│   ├── admin/
+│   │   ├── cloudflare-api.ts    ← Cloudflare GraphQL usage stats
+│   │   ├── config.ts            ← readConfigJson + legacy schema migration
+│   │   ├── config-schema.ts     ← runtime validator for KV config
+│   │   ├── pages.ts             ← nginx() / html1101() disguise pages
+│   │   ├── parse-address.ts     ← proxy IP parse + cache + deterministic shuffle
+│   │   ├── preferred-sub.ts     ← preferred-IP API + multi-encoding CSV parser
+│   │   ├── proxy-resolver.ts    ← parseSocks5Auth + parseProxyParams
+│   │   ├── random-ip.ts         ← ISP-aware random IP generator
+│   │   └── transport.ts         ← transport config helpers
+│   └── utils/
+│       ├── bytes.ts             ← byte-array helpers
+│       ├── dns.ts               ← DoH + ECH config extraction
+│       ├── hostname.ts          ← IP/hostname classification
+│       ├── log.ts               ← access log + Telegram push
+│       ├── logger.ts            ← debug log
+│       ├── path.ts              ← randomPath / replaceAsterisks / bulkReplaceDomains
+│       └── url.ts               ← normalizeRequestUrl / toArray
+└── tests/
+    ├── admin/                   ← config-schema, proxy-resolver, transport, random-ip
+    ├── handlers/                ← (currently empty after SS-inbound removal)
+    ├── integration/             ← end-to-end via wrangler unstable_dev
+    ├── protocols/               ← VLESS + dispatch boundaries
+    ├── subscription/            ← Surge patcher
+    ├── transports/              ← socket-utils, byob
+    ├── utils/                   ← bytes, url, hostname, path, log
+    └── crypto/                  ← md5
 ```
 
-## 关键架构变化
+## Key architectural changes from upstream
 
-### 1. 模块全局变量 → 请求级 ProxyContext
+### 1. Module-level globals → request-scoped ProxyContext
 
-原代码使用模块顶层 mutable 变量（`let 反代IP = ''` 之类），依赖 fetch handler 在每次请求开头重置它们。这种做法在 Cloudflare Workers isolate 复用 + 并发请求场景下脆弱——状态可能串。
+The original code used module-top-level mutable state (`let 反代IP = ''` and
+similar), relying on the fetch handler to reset them on every request. This
+is fragile under Cloudflare Workers' isolate reuse + concurrent requests —
+state can bleed between requests.
 
-新代码：所有请求级状态在 `ProxyContext` 对象里，fetch handler 顶部 `createDefaultContext()`，逐层显式传参。
+The refactor moves all per-request state into a `ProxyContext` object,
+created at the top of the fetch handler and threaded explicitly through
+every layer.
 
 ```typescript
-// 原
+// Before
 let 反代IP = '';
 function 处理请求() { 反代IP = '...' }
 
-// 新
+// After
 const ctx = createDefaultContext();
 function handleRequest(ctx: ProxyContext) { ctx.proxyIP = '...' }
 ```
 
-### 2. 中文标识符全部翻译为英文
+### 2. All Chinese identifiers translated to English
 
-所有变量名、函数名、字段名、对象键全部改成英文。**字符串字面量保留中文**（用户面向的 TG 推送模板、ISP 显示名 `CF移动优选`、加密密钥默认提示、CSV 表头 `IP地址`/`端口`/`数据中心` 等都是功能性数据）。
+Every variable, function, field, and object key is now English. **String
+literals stay in Chinese where they're user-facing data** (Telegram push
+templates, ISP labels like `CF移动优选`, default-key prompts, CSV headers
+like `IP地址`/`端口`/`数据中心` — these are functional payload, not code).
 
-主要重命名：
+Notable renames:
 
-| 原中文标识符 | 新英文 |
+| Old (Chinese) | New (English) |
 |---|---|
 | `反代IP` | `ctx.proxyIP` |
 | `启用SOCKS5反代` | `ctx.socks5Mode` |
@@ -151,10 +167,8 @@ function handleRequest(ctx: ProxyContext) { ctx.proxyIP = '...' }
 | `处理WS请求` | `handleWebSocketRequest` |
 | `处理XHTTP请求` | `handleXhttpRequest` |
 | `处理gRPC请求` | `handleGrpcRequest` |
-| `解析木马请求` | `parseTrojanRequest` |
 | `解析魏烈思请求` | `parseVlessRequest` |
 | `读取XHTTP首包` | `readFirstPacket` |
-| `转发木马UDP数据` | `forwardTrojanUdp` |
 | `MD5MD5` | `md5x2` |
 | `读取config_JSON` | `readConfigJson` |
 | `生成随机IP` | `generateRandomIPs` |
@@ -172,112 +186,184 @@ function handleRequest(ctx: ProxyContext) { ctx.proxyIP = '...' }
 | `获取SOCKS5账号` | `parseSocks5Auth` |
 | `解析地址端口` | `parseAddressPort` |
 
-### 3. config.json schema：旧中文键 → 新英文键 + 自动迁移
+### 3. config.json schema: Chinese keys → English keys + auto-migration
 
-原存储在 KV `config.json` 里的字段名是中文（`协议类型`、`反代`、`优选订阅生成`…）。新代码使用全英文 schema，但 `readConfigJson` 检测到旧 schema 时会**透明地递归迁移并写回 KV**——存量用户更新代码后无需手动迁移。
-
-```
-协议类型 → protocol             订阅转换配置 → subConverter
-传输协议 → transport             反代 → proxy
-gRPC模式 → grpcMode              路径模板 → template
-随机路径 → randomPath            全局 → global
-跳过证书验证 → skipCertVerify    标准 → standard
-启用0RTT → enable0RTT            账号 → auth
-TLS分片 → tlsFragment            白名单 → whitelist
-完整节点路径 → fullNodePath      加密方式 → cipher
-加载时间 → loadTime              优选订阅生成 → preferredSub
-本地IP库 → localIP                 随机IP → randomIP
-随机数量 → count                   指定端口 → port
-SOCKS5.启用 → SOCKS5.mode        TG.启用 → TG.enabled
-```
-
-迁移逻辑见 `src/admin/config.ts` 顶部的 `SCHEMA_MIGRATION` / `SCOPED_MIGRATION` 表和 `migrateLegacySchema()` 函数。第一次读取后会写回新 shape，后续读取直接 no-op。
-
-### 4. 单文件源 → 编译产物
-
-原工作流：编辑 `_worker.js` → 直接部署。
-新工作流：编辑 `src/**/*.ts` → `npm run build` → 生成 `_worker.js` → 部署。
-
-**部署产物形态不变**——`_worker.js` 仍然是单文件，仍然可以粘贴到 Workers Dashboard 或上传到 Pages。只是它现在是 **esbuild 打包产物** 而不是手写源码。
-
-## 测试覆盖
+The `config.json` stored in KV used to have Chinese field names
+(`协议类型`, `反代`, `优选订阅生成`, …). The new code uses an all-English
+schema, but `readConfigJson` detects legacy shapes and **transparently
+migrates and writes back the new shape on first read**. Existing users
+upgrading don't need to do anything.
 
 ```
-crypto/        88 个测试  ChaCha20、Poly1305、ChaCha20-Poly1305 用 RFC 8439 标准向量；
-                          SHA-224 用 FIPS 180-4 Appendix A 向量；md5、tls-record、
-                          tls-messages 各自有覆盖
-protocols/     35 个测试  VLESS / Trojan 全边界（错 UUID、错命令、错地址类型、半包等）；
-                          dispatch 包含 byte-by-byte 分块场景
-transports/    32 个测试  socket-utils（close/wsSend/waitConnect）、tls-wrap、
-                          udp（Trojan UDP 帧）、byob-stream
-handlers/       9 个测试  SS 入站目标头解析
-subscription/   6 个测试  Surge 补丁
-admin/         30 个测试  proxy-resolver、transport、random-ip（CIDR + ISP 适配）
-utils/         50 个测试  bytes、url、hostname、path、log
+协议类型 → protocol               订阅转换配置 → subConverter
+传输协议 → transport               反代 → proxy
+gRPC模式 → grpcMode                路径模板 → template
+随机路径 → randomPath              全局 → global
+跳过证书验证 → skipCertVerify      标准 → standard
+启用0RTT → enable0RTT              账号 → auth
+TLS分片 → tlsFragment              白名单 → whitelist
+完整节点路径 → fullNodePath        优选订阅生成 → preferredSub
+加载时间 → loadTime                本地IP库 → localIP
+随机IP → randomIP                  随机数量 → count
+指定端口 → port
+SOCKS5.启用 → SOCKS5.mode          TG.启用 → TG.enabled
 ```
 
-**未覆盖区域**——以下模块依赖真实网络/Workers runtime，单元测试价值有限：
-- `transports/direct.ts` 的 `forwardTcp` 主路径（深度集成 WebSocket + connect()）
-- `crypto/tls-client.ts` 的完整握手（需要真实 TLS 服务器）
-- `handlers/websocket.ts` / `handlers/xhttp.ts` / `handlers/grpc.ts` 数据面主流程
-- `subscription/clash.ts` / `subscription/singbox.ts` 大段补丁逻辑
+Migration logic lives in `src/admin/config.ts` (`SCHEMA_MIGRATION`,
+`SCOPED_MIGRATION`, `migrateLegacySchema()`). After the first read, the
+migrated shape is persisted back to KV so subsequent reads skip the rename
+pass.
 
-需要部署到 Cloudflare Workers 做集成测试验证。
+### 4. KV config validation at the boundary
 
-## Bundle 大小分析
+In addition to the schema migration, `readConfigJson` runs a hand-rolled
+validator (`src/admin/config-schema.ts`) on the migrated config. Wrong-type
+fields are coerced to documented defaults in place; issues are logged via
+`console.warn` and attached to `configJson.__validation` so the admin UI
+can surface them. Bad config never throws — it produces warnings and
+keeps serving.
 
-`_worker.js` 当前约 **77 KB**（VLESS-only + esbuild minify；CF Workers 免费版上限 1 MB unzipped，使用率约 8%）。CI 已设硬上限 900 KB；当 bundle 接近这个值时再考虑下面的优化。
+Validated fields (the ones whose wrong type would crash a downstream
+handler): `protocol` (enum), `transport` (enum), `grpcMode` (enum),
+`enable0RTT` / `randomPath` / `skipCertVerify` / `ECH` (boolean), `HOSTS`
+(string array), `PATH` / `Fingerprint` (string), `tlsFragment`
+(`Shadowrocket | Happ | null`), `preferredSub.localIP.{count, port,
+randomIP}`. Cosmetic fields are left alone — the admin UI handles its own
+input validation.
 
-随时运行 `npm run analyze` 可获取最新的逐模块 size breakdown（基于 esbuild metafile）。
+### 5. Single source file → compiled artefact
 
-### 当前贡献 Top 10（截至 2026-05）
+Old workflow: edit `_worker.js` directly → deploy.
+New workflow: edit `src/**/*.ts` → `npm run build` → produces `_worker.js`
+→ deploy.
 
-| 模块 | 大小 | 备注 |
+**Deployment shape is unchanged** — `_worker.js` is still a single file you
+can paste into the Workers Dashboard or upload via Pages. It's now an
+esbuild bundle (minified, ~77 KB) instead of hand-written source. CI has a
+drift check that fails any PR that ships a stale `_worker.js`.
+
+### 6. Protocol simplification: VLESS-only
+
+Shadowsocks, Trojan, and the HTTPS upstream proxy mode (with its hand-rolled
+TLS 1.2/1.3 client) were dropped. Reasoning, briefly:
+
+- **VLESS** handles essentially all the use cases this project serves.
+  Cloudflare fronts the worker, so user-facing fallback and disguise are
+  handled outside the proxy protocol layer.
+- **The HTTPS upstream proxy** was the only consumer of `tls-client.ts`,
+  which existed because Workers' `connect()` originally didn't support
+  outbound TLS. That gap is closed (`connect({ secureTransport: 'on' })`
+  works natively now), so the hand-rolled implementation was platform-
+  specific debt with zero portability benefit. Native TLS exists on every
+  alternative platform (Node `tls.connect`, Deno `Deno.connectTls`, Bun's
+  built-in TLS) — a JavaScript TLS implementation helps nowhere.
+
+The bundle dropped from 232 KB → 77 KB across these changes.
+
+## Test coverage
+
+```
+crypto/        5 tests   md5 only (the rest of the crypto modules were deleted)
+protocols/   ~30 tests   VLESS frame parser + dispatch boundary cases
+transports/  ~18 tests   socket-utils, byob-stream
+handlers/    no tests yet (the SS inbound suite was removed with SS support)
+subscription/ 4 tests   Surge MANAGED-CONFIG header
+admin/      ~70 tests   config-schema (35), proxy-resolver, transport, random-ip
+utils/      ~50 tests   bytes, url, hostname, path, log
+integration/ 6 tests   wrangler unstable_dev — routing surface (robots.txt,
+                       /admin auth gate, /version, etc.)
+```
+
+**Untested areas** — modules that depend on real network or Workers runtime
+and aren't worth unit-testing in node:
+
+- `transports/direct.ts` `forwardTcp` (deeply integrates WebSocket +
+  `cloudflare:sockets` `connect()`)
+- `handlers/websocket.ts` / `xhttp.ts` / `grpc.ts` data-plane main loops
+- Bulk of the Clash / Sing-box subscription patchers
+
+These need integration testing or full deployment to verify.
+
+## Bundle size analysis
+
+`_worker.js` currently ~77 KB minified (CF Workers free tier limit is 1 MB
+unzipped; using ~8%). CI enforces a 900 KB hard ceiling.
+
+Run `npm run analyze` for an up-to-date per-module size breakdown via the
+esbuild metafile.
+
+### Top contributors (post-cleanup)
+
+| Module | Size | Notes |
 |---|---|---|
-| `crypto/tls-client.ts` | 25.7 KB | 出站 TLS 客户端，**仅** `socks5Mode === 'https'` 路径调用 |
-| `subscription/singbox.ts` | 13.5 KB | 仅 `/sub` 路径调用 |
-| `handlers/sub.ts` | 10.8 KB | 订阅入口；仅 `/sub` |
-| `admin/config.ts` | 10.4 KB | KV CRUD，仅 `/admin` |
-| `handlers/grpc.ts` | 10.2 KB | 数据面热路径 |
-| `admin/preferred-sub.ts` | 10.0 KB | 仅 `/admin` |
-| `handlers/ss-inbound.ts` | 9.4 KB | 数据面热路径（SS 协议） |
-| `handlers/websocket.ts` | 9.0 KB | 数据面热路径 |
-| `subscription/clash.ts` | 8.1 KB | 仅 `/sub` |
+| `subscription/singbox.ts` | 13.5 KB | only on `/sub` path |
+| `admin/config.ts` | ~10 KB | only on `/admin` |
+| `admin/preferred-sub.ts` | ~10 KB | only on `/admin` |
+| `handlers/sub.ts` | ~10 KB | `/sub` entry |
+| `handlers/grpc.ts` | ~8 KB | data-plane hot path |
+| `subscription/clash.ts` | ~8 KB | only on `/sub` |
+| `handlers/admin.ts` | ~7 KB | only on `/admin` |
+| `handlers/websocket.ts` | ~5 KB | data-plane hot path |
 
-### 分组(粗略)
+### Future shrinking, if needed
 
-- **数据面热路径**(始终需要): handlers/transports/protocols 大部分 + 必需 crypto ≈ 95 KB
-- **冷路径**(请求时才命中): admin UI ≈ 25 KB · 订阅生成 ≈ 23 KB · TLS 客户端 ≈ 35 KB
+If the bundle ever approaches 1 MB (e.g., adding a REALITY-style protocol
+or embedded static assets), the cold-path strip order is:
 
-### 未来 lazy-load / WORKER_LITE 路线（**仅在真到 size pressure 时再做**）
+1. **Subscription system** (`handlers/sub.ts` + `subscription/*` ≈ 33 KB).
+   If a deployment only needs single-node access, skip the whole thing.
+2. **Admin UI** (`handlers/admin.ts` + `admin/pages.ts` +
+   `admin/preferred-sub.ts` + `admin/cloudflare-api.ts` ≈ 25 KB). A
+   minimal deployment can disable `/admin` entirely and configure the UUID
+   via env var.
 
-如果 bundle 增长到接近 1 MB(例如新增 REALITY-style 协议、AEAD-2022、内嵌静态资源等),按 **冷路径优先** 的顺序剥离:
+#### Implementation note
 
-1. **TLS 客户端家族**(`tls-client` + `tls-messages` + `tls-record` ≈ 35 KB)。绝大多数用户 `socks5Mode` 不是 `'https'`,可通过 esbuild `alias` 把 `transports/https-proxy.ts` 在 `WORKER_LITE` 模式下指向 stub,运行时若真的命中再返回明确错误。
-2. **订阅系统**(`handlers/sub.ts` + `subscription/* ≈ 33 KB`)。如果用户只用单节点不需要订阅,完全可剥离。
-3. **Admin UI**(`handlers/admin.ts` + `admin/pages.ts` + `admin/preferred-sub.ts` + `admin/cloudflare-api.ts` ≈ 25 KB)。极简部署可直接禁用 `/admin`,通过环境变量配 UUID。
+esbuild `bundle: true` does **not** save bundle size via dynamic
+`import()` — static imports are inlined regardless. Code splitting only
+takes effect with `splitting: true` and multiple output files, which the
+project's single-file deployment shape forbids.
 
-#### 实现注意事项
+The correct strip technique is **build-time aliasing**: use esbuild's
+`alias` to point heavy modules at stub files when a `WORKER_LITE` flag is
+set; esbuild's DCE then removes the entire subgraph.
 
-- esbuild `bundle: true` **不会**通过 dynamic `import()` 实现真正的 size 节省 —— 静态导入还是会被 inlining,代码分割只在 `splitting: true` 多文件输出下生效,而项目部署形态(单文件 `_worker.js`)不允许多文件。
-- 因此正确的剥离方式是 **build-time aliasing**:`alias` 把重模块换成 stub,esbuild DCE 会把整个子图剔除。
-- WORKER_LITE 是 cross-cutting change,**当前没有 size pressure 时不要做**,会引入测试矩阵翻倍(全功能 + lite 双模)和回归风险。
+`WORKER_LITE` is a cross-cutting change that doubles the test matrix
+(full + lite). **Don't do it without real size pressure.**
 
-## 重要注意事项
+## Important things to know before editing
 
-1. **原始单文件保存在初始提交里**。`_worker.original.js` 已从工作树移除（避免每次构建产物提交时的 noisy diff），但作为 4619 行原始代码的"原貌"快照保存在初始提交 `8de49df` 里。需要查阅或 diff 时：
+1. **The original single file lives in the initial commit.** It was
+   removed from the working tree (to avoid noisy diffs every time the
+   build artefact changes), but the 4619-line original is preserved as
+   a snapshot in the initial commit. To inspect or diff:
+
    ```bash
-   git show 8de49df:_worker.original.js > /tmp/_worker.original.js
+   git show <initial-commit>:_worker.original.js > /tmp/_worker.original.js
    diff /tmp/_worker.original.js _worker.js
    ```
 
-2. **手写加密代码不要重构**。`chacha20.ts`、`poly1305.ts`、`sha224.ts` 是密码学敏感——按位移、按字节、按特定常量。任何"看起来更优雅"的改写都可能改变算法语义。
+2. **`md5.ts` is the only remaining crypto module.** It uses a Cloudflare-
+   specific Web Crypto extension (`crypto.subtle.digest('MD5', ...)`),
+   which means node tests can't import it — they must use `node:crypto`'s
+   `createHash('md5')` if they need the same digest. Integration tests do
+   this; see `tests/integration/fetch-handler.test.ts`.
 
-3. **TLS 客户端模块整体保留**（~600 行）。`tls-client.ts` 的内部状态机非常紧密耦合，进一步拆分反而更难读。
+3. **After your first deploy**, verify the routing surface via
+   `wrangler tail` or hit `/admin`:
+   - WebSocket connection (VLESS only — SS / Trojan removed)
+   - Subscription generation (Clash / Sing-box / Surge)
+   - Old KV config auto-migration (if upgrading from upstream)
 
-4. **首次部署后**用 TG 推送或 `/admin` 后台验证一遍：
-   - WebSocket 连接（VLESS / Trojan / SS 三种协议都试一下）
-   - 订阅生成（Clash / Sing-box / Surge）
-   - 旧 KV 配置自动迁移（如果是从旧版升级）
+4. **Upstream sync.** Upstream's `.github/workflows/sync.yml` periodically
+   pulls `_worker.js` from `cmliu/edgetunnel`. This fork removed that
+   workflow — to track upstream changes, manually pull the original from
+   the initial commit (`git show <initial-commit>:_worker.original.js`)
+   as a baseline, diff against upstream's latest `_worker.js`, and decide
+   which differences need to land in `src/`.
 
-5. **上游同步**：原仓库的 `.github/workflows/sync.yml` 会定时从 `cmliu/edgetunnel` 拉 `_worker.js`。本项目已移除该 workflow——如果想跟踪上游变更，建议手动从初始提交取出原始单文件（`git show 8de49df:_worker.original.js`）作为基准，diff 上游最新 `_worker.js`，再决定哪些差异需要回填到 `src/`。
+5. **CI drift check.** `.github/workflows/ci.yml` snapshots the committed
+   `_worker.js`, runs `npm run build`, and fails the workflow if they
+   diverge. If your PR touches `src/**/*.ts`, you must rebuild and commit
+   the resulting `_worker.js`. Forgetting to rebuild is the most common
+   contributor footgun; the drift check exists specifically to catch it.

@@ -30,7 +30,6 @@ const SCHEMA_MIGRATION: Record<string, string> = {
   'TLS分片': 'tlsFragment',
   '完整节点路径': 'fullNodePath',
   '加载时间': 'loadTime',
-  '加密方式': 'cipher',
   '优选订阅生成': 'preferredSub',
   '本地IP库': 'localIP',
   '随机IP': 'randomIP',
