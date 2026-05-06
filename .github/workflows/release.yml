@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish _worker.js
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Bundle size budget (<900KB)
+        run: |
+          size=$(stat -c%s _worker.js)
+          limit=921600
+          printf 'Bundle size: %s bytes (limit: %s)\n' "$size" "$limit"
+          if [ "$size" -gt "$limit" ]; then
+            echo "::error::_worker.js exceeds 900KB budget ($size bytes)."
+            exit 1
+          fi
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: _worker.js
+          generate_release_notes: true
+          fail_on_unmatched_files: true

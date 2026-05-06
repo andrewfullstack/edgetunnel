@@ -18,5 +18,5 @@
     "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "_worker.js", "_worker.original.js"]
+  "exclude": ["node_modules", "_worker.js"]
 }

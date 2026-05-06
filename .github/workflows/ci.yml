@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: lint · test · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check (tsc --noEmit)
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Snapshot committed _worker.js
+        id: snapshot
+        run: |
+          if [ -f _worker.js ]; then
+            cp _worker.js _worker.committed.js
+            echo "had_committed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "had_committed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Bundle size budget (<900KB)
+        run: |
+          size=$(stat -c%s _worker.js)
+          limit=921600
+          printf 'Bundle size: %s bytes (limit: %s)\n' "$size" "$limit"
+          if [ "$size" -gt "$limit" ]; then
+            echo "::error::_worker.js exceeds 900KB budget ($size bytes). Cloudflare Workers free tier limit is 1MB unzipped."
+            exit 1
+          fi
+
+      - name: Verify committed _worker.js matches build
+        if: steps.snapshot.outputs.had_committed == 'true'
+        run: |
+          if ! diff -q _worker.committed.js _worker.js >/dev/null; then
+            echo "::error::Committed _worker.js is out of date. Run 'npm run build' locally and commit the result."
+            echo "--- diff (first 80 lines) ---"
+            diff _worker.committed.js _worker.js | head -80 || true
+            exit 1
+          fi
+          echo "Committed _worker.js matches fresh build."

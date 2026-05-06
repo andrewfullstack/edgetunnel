@@ -23,7 +23,7 @@ The goal of this refactor is simple: **make the project something anyone can rea
 测试通过            227 / 227
 TypeScript 错误     0
 构建产物            _worker.js (232 KB, esbuild bundled)
-对比原始单文件      _worker.original.js (242 KB, 4619 行)
+对比原始单文件      git show <initial-commit>:_worker.original.js
 ```
 
 ```bash
@@ -38,8 +38,7 @@ npm run deploy   # build + wrangler deploy
 
 ```
 edgetunnel/
-├── _worker.original.js          ← 原始单文件备份（4619 行，未改动，用于参考）
-├── _worker.js                   ← 构建产物（被 npm run build 覆盖）
+├── _worker.js                   ← 构建产物（被 npm run build 覆盖；原始单文件 _worker.original.js 已从工作树移除，保存在初始提交里）
 ├── package.json                 ← 依赖 + 脚本
 ├── tsconfig.json                ← TypeScript 配置
 ├── build.mjs                    ← esbuild 入口
@@ -227,7 +226,11 @@ utils/         50 个测试  bytes、url、hostname、path、log
 
 ## 重要注意事项
 
-1. **`_worker.original.js` 必须保留**。它是 4619 行原始代码，是所有"原代码是怎么写的"问题的唯一来源。也方便随时 diff 验证行为是否一致。
+1. **原始单文件保存在初始提交里**。`_worker.original.js` 已从工作树移除（避免每次构建产物提交时的 noisy diff），但作为 4619 行原始代码的"原貌"快照保存在初始提交 `8de49df` 里。需要查阅或 diff 时：
+   ```bash
+   git show 8de49df:_worker.original.js > /tmp/_worker.original.js
+   diff /tmp/_worker.original.js _worker.js
+   ```
 
 2. **手写加密代码不要重构**。`chacha20.ts`、`poly1305.ts`、`sha224.ts` 是密码学敏感——按位移、按字节、按特定常量。任何"看起来更优雅"的改写都可能改变算法语义。
 
@@ -238,4 +241,4 @@ utils/         50 个测试  bytes、url、hostname、path、log
    - 订阅生成（Clash / Sing-box / Surge）
    - 旧 KV 配置自动迁移（如果是从旧版升级）
 
-5. **上游同步**：原仓库的 `.github/workflows/sync.yml` 会定时从 `cmliu/edgetunnel` 拉 `_worker.js`。本项目已移除该 workflow——如果想跟踪上游变更，建议改为手动 diff `_worker.original.js`，再决定哪些差异需要回填到 `src/`。
+5. **上游同步**：原仓库的 `.github/workflows/sync.yml` 会定时从 `cmliu/edgetunnel` 拉 `_worker.js`。本项目已移除该 workflow——如果想跟踪上游变更，建议手动从初始提交取出原始单文件（`git show 8de49df:_worker.original.js`）作为基准，diff 上游最新 `_worker.js`，再决定哪些差异需要回填到 `src/`。
