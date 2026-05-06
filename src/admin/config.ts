@@ -14,6 +14,7 @@ import { maskSensitive } from '../utils/log.js';
 import { getCloudflareUsage } from './cloudflare-api.js';
 import { getTransportConfig, getTransportPath } from './transport.js';
 import { toArray } from '../utils/url.js';
+import { validateConfig, formatIssues, type ValidationIssue } from './config-schema.js';
 import type { ProxyContext } from '../state.js';
 
 const PROXYIP_KEY = atob('UFJPWFlJUA=='); // "PROXYIP" — kept obfuscated like original
@@ -144,6 +145,7 @@ export async function readConfigJson(
   };
 
   let configJson: any;
+  let validationIssues: ValidationIssue[] = [];
   try {
     const stored = await env.KV.get('config.json');
     if (!stored || resetConfig) {
@@ -152,10 +154,18 @@ export async function readConfigJson(
     } else {
       const parsed = JSON.parse(stored);
       const migrated = migrateLegacySchema(parsed);
-      configJson = migrated;
-      // Persist the migrated shape so subsequent reads skip the rename pass.
-      if (JSON.stringify(parsed) !== JSON.stringify(migrated)) {
-        await env.KV.put('config.json', JSON.stringify(migrated, null, 2));
+      // Validate the migrated shape: bad-typed fields are coerced to known
+      // defaults in place; issues are surfaced via console.warn and attached
+      // to configJson.__validation for the admin UI to read.
+      const { config: validated, issues } = validateConfig(migrated);
+      validationIssues = issues;
+      if (issues.length > 0) {
+        console.warn(formatIssues(issues));
+      }
+      configJson = validated;
+      // Persist the migrated+validated shape so subsequent reads skip both passes.
+      if (JSON.stringify(parsed) !== JSON.stringify(validated)) {
+        await env.KV.put('config.json', JSON.stringify(validated, null, 2));
       }
     }
   } catch (error: any) {
@@ -163,6 +173,9 @@ export async function readConfigJson(
     configJson = defaultConfig;
   }
   ctx.configJson = configJson;
+  // Surface validation results so admin UI can display them. Always set,
+  // even when empty, so the UI can distinguish "not validated yet" from "clean".
+  configJson.__validation = { issues: validationIssues };
 
   // Apply env overrides + defaults
   if (!configJson.gRPCUserAgent) configJson.gRPCUserAgent = ua;

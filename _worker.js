@@ -670,6 +670,145 @@ function getTransportPath(config = {}, nodePath = "/", asPreferredSubGenerator =
   return pathValue.split("?")[0] || "/";
 }
 
+// src/admin/config-schema.ts
+var PROTOCOLS = ["vless", "trojan", "ss"];
+var TRANSPORTS = ["ws", "xhttp", "grpc"];
+var GRPC_MODES = ["gun", "multi"];
+var TLS_FRAGMENTS = ["Shadowrocket", "Happ"];
+function describe(value) {
+  if (value === null) return "null";
+  if (value === void 0) return "undefined";
+  if (Array.isArray(value)) return `array(length=${value.length})`;
+  if (typeof value === "object") return "object";
+  if (typeof value === "string") return `string ${JSON.stringify(value)}`;
+  return `${typeof value} ${String(value)}`;
+}
+function validateConfig(input) {
+  const issues = [];
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    issues.push({
+      path: "",
+      message: `expected object at root, got ${describe(input)} \u2014 replaced with empty config`
+    });
+    return { config: {}, issues };
+  }
+  const c = input;
+  const enumField = (parent, key, allowed, deflt, path) => {
+    if (parent[key] === void 0 || parent[key] === null) return;
+    if (typeof parent[key] !== "string" || !allowed.includes(parent[key])) {
+      issues.push({
+        path,
+        message: `expected one of [${allowed.join(", ")}], got ${describe(parent[key])} \u2014 replaced with '${deflt}'`
+      });
+      parent[key] = deflt;
+    }
+  };
+  const boolField = (parent, key, deflt, path) => {
+    if (parent[key] === void 0 || parent[key] === null) return;
+    if (typeof parent[key] !== "boolean") {
+      issues.push({
+        path,
+        message: `expected boolean, got ${describe(parent[key])} \u2014 replaced with ${deflt}`
+      });
+      parent[key] = deflt;
+    }
+  };
+  const intField = (parent, key, min, max, deflt, path) => {
+    if (parent[key] === void 0 || parent[key] === null) return;
+    const v = parent[key];
+    if (typeof v !== "number" || !Number.isInteger(v) || v < min || v > max) {
+      issues.push({
+        path,
+        message: `expected integer in [${min}, ${max}], got ${describe(v)} \u2014 replaced with ${deflt}`
+      });
+      parent[key] = deflt;
+    }
+  };
+  const stringField = (parent, key, deflt, path) => {
+    if (parent[key] === void 0 || parent[key] === null) return;
+    if (typeof parent[key] !== "string") {
+      issues.push({
+        path,
+        message: `expected string, got ${describe(parent[key])} \u2014 replaced with '${deflt}'`
+      });
+      parent[key] = deflt;
+    }
+  };
+  const stringArrayField = (parent, key, deflt, path) => {
+    if (parent[key] === void 0 || parent[key] === null) return;
+    if (!Array.isArray(parent[key]) || !parent[key].every((x) => typeof x === "string")) {
+      issues.push({
+        path,
+        message: `expected string[], got ${describe(parent[key])} \u2014 replaced with [${deflt.join(", ")}]`
+      });
+      parent[key] = deflt.slice();
+    }
+  };
+  enumField(c, "protocol", PROTOCOLS, "vless", "protocol");
+  enumField(c, "transport", TRANSPORTS, "ws", "transport");
+  enumField(c, "grpcMode", GRPC_MODES, "gun", "grpcMode");
+  boolField(c, "enable0RTT", false, "enable0RTT");
+  boolField(c, "randomPath", false, "randomPath");
+  boolField(c, "skipCertVerify", false, "skipCertVerify");
+  boolField(c, "ECH", false, "ECH");
+  stringField(c, "PATH", "/", "PATH");
+  stringField(c, "Fingerprint", "chrome", "Fingerprint");
+  stringArrayField(c, "HOSTS", [], "HOSTS");
+  if (c.tlsFragment !== void 0 && c.tlsFragment !== null) {
+    if (typeof c.tlsFragment !== "string" || !TLS_FRAGMENTS.includes(c.tlsFragment)) {
+      issues.push({
+        path: "tlsFragment",
+        message: `expected one of [${TLS_FRAGMENTS.join(", ")}] or null, got ${describe(c.tlsFragment)} \u2014 replaced with null`
+      });
+      c.tlsFragment = null;
+    }
+  }
+  if (c.SS !== void 0 && c.SS !== null) {
+    if (typeof c.SS !== "object" || Array.isArray(c.SS)) {
+      issues.push({
+        path: "SS",
+        message: `expected object, got ${describe(c.SS)} \u2014 replaced with default`
+      });
+      c.SS = { cipher: "aes-128-gcm", TLS: true };
+    } else {
+      boolField(c.SS, "TLS", true, "SS.TLS");
+      stringField(c.SS, "cipher", "aes-128-gcm", "SS.cipher");
+    }
+  }
+  if (c.preferredSub !== void 0 && c.preferredSub !== null) {
+    if (typeof c.preferredSub !== "object" || Array.isArray(c.preferredSub)) {
+      issues.push({
+        path: "preferredSub",
+        message: `expected object, got ${describe(c.preferredSub)} \u2014 sub-object not validated`
+      });
+    } else {
+      const ps = c.preferredSub;
+      boolField(ps, "local", true, "preferredSub.local");
+      intField(ps, "SUBUpdateTime", 1, 24 * 30, 3, "preferredSub.SUBUpdateTime");
+      stringField(ps, "SUBNAME", "edgetunnel", "preferredSub.SUBNAME");
+      if (ps.localIP !== void 0 && ps.localIP !== null) {
+        if (typeof ps.localIP !== "object" || Array.isArray(ps.localIP)) {
+          issues.push({
+            path: "preferredSub.localIP",
+            message: `expected object, got ${describe(ps.localIP)} \u2014 sub-object not validated`
+          });
+        } else {
+          boolField(ps.localIP, "randomIP", true, "preferredSub.localIP.randomIP");
+          intField(ps.localIP, "count", 1, 1024, 16, "preferredSub.localIP.count");
+          intField(ps.localIP, "port", -1, 65535, -1, "preferredSub.localIP.port");
+        }
+      }
+    }
+  }
+  return { config: c, issues };
+}
+function formatIssues(issues) {
+  if (issues.length === 0) return "";
+  const lines = issues.map((i) => `  - ${i.path || "<root>"}: ${i.message}`);
+  return `config.json validation: ${issues.length} issue(s)
+${lines.join("\n")}`;
+}
+
 // src/admin/config.ts
 var PROXYIP_KEY = atob("UFJPWFlJUA==");
 var SCHEMA_MIGRATION = {
@@ -774,6 +913,7 @@ async function readConfigJson(ctx, env, hostname, userID, ua = "Mozilla/5.0", re
     }
   };
   let configJson;
+  let validationIssues = [];
   try {
     const stored = await env.KV.get("config.json");
     if (!stored || resetConfig) {
@@ -782,9 +922,14 @@ async function readConfigJson(ctx, env, hostname, userID, ua = "Mozilla/5.0", re
     } else {
       const parsed = JSON.parse(stored);
       const migrated = migrateLegacySchema(parsed);
-      configJson = migrated;
-      if (JSON.stringify(parsed) !== JSON.stringify(migrated)) {
-        await env.KV.put("config.json", JSON.stringify(migrated, null, 2));
+      const { config: validated, issues } = validateConfig(migrated);
+      validationIssues = issues;
+      if (issues.length > 0) {
+        console.warn(formatIssues(issues));
+      }
+      configJson = validated;
+      if (JSON.stringify(parsed) !== JSON.stringify(validated)) {
+        await env.KV.put("config.json", JSON.stringify(validated, null, 2));
       }
     }
   } catch (error) {
@@ -792,6 +937,7 @@ async function readConfigJson(ctx, env, hostname, userID, ua = "Mozilla/5.0", re
     configJson = defaultConfig;
   }
   ctx.configJson = configJson;
+  configJson.__validation = { issues: validationIssues };
   if (!configJson.gRPCUserAgent) configJson.gRPCUserAgent = ua;
   configJson.HOST = host;
   if (!configJson.HOSTS) configJson.HOSTS = [hostname];
