@@ -12,7 +12,7 @@
 // the routing surface: pure HTTP endpoints + auth gates.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { unstable_dev, type UnstableDevWorker } from 'wrangler';
+import { unstable_dev, type Unstable_DevWorker } from 'wrangler';
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
@@ -20,7 +20,7 @@ const ADMIN_PASSWORD = 'integration-test-pw';
 
 // Computed in beforeAll once we know the host (workerd assigns localhost:port).
 let derivedUserID: string;
-let worker: UnstableDevWorker;
+let worker: Unstable_DevWorker;
 
 /**
  * Re-derive the userID exactly the way src/index.ts does, so we can

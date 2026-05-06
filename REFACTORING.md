@@ -226,7 +226,7 @@ utils/         50 个测试  bytes、url、hostname、path、log
 
 ## Bundle 大小分析
 
-`_worker.js` 当前约 **232 KB**（CF Workers 免费版上限 1 MB unzipped，使用率约 23%）。CI 已设硬上限 900 KB；当 bundle 接近这个值时再考虑下面的优化。
+`_worker.js` 当前约 **119 KB**（esbuild minify 启用后；CF Workers 免费版上限 1 MB unzipped，使用率约 12%）。CI 已设硬上限 900 KB；当 bundle 接近这个值时再考虑下面的优化。
 
 随时运行 `npm run analyze` 可获取最新的逐模块 size breakdown（基于 esbuild metafile）。
 

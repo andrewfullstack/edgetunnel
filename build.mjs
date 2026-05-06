@@ -10,8 +10,9 @@ await esbuild.build({
   target: 'es2022',
   platform: 'neutral',
   outfile: '_worker.js',
-  minify: false,
+  minify: true,
   sourcemap: false,
+  legalComments: 'none',
   banner: {
     js: `// Built from src/ - DO NOT EDIT directly. Edit source files in src/ instead.`,
   },
