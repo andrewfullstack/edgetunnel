@@ -2,8 +2,6 @@
 
 [中文版本 / Chinese version →](./README.zh.md)
 
-[![CI](https://github.com/cmliu/edgetunnel/actions/workflows/ci.yml/badge.svg)](https://github.com/cmliu/edgetunnel/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/cmliu/edgetunnel?style=flat-square)](./LICENSE)
 
 A VLESS proxy that runs on Cloudflare Workers / Pages.
 
