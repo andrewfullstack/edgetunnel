@@ -7,18 +7,17 @@
 //
 // The protobuf message starts with a tag byte (0x0a) + varint-encoded
 // length + raw payload bytes. We parse those wrappers off, then treat
-// the inner bytes as VLESS or Trojan first packet (auto-detected).
+// the inner bytes as a VLESS first packet.
 
-import { byteLength, concatBytes } from '../utils/bytes.js';
+import { concatBytes } from '../utils/bytes.js';
 import { isSpeedTestSite } from '../utils/hostname.js';
 import { parseVlessRequest } from '../protocols/vless.js';
-import { parseTrojanRequest } from '../protocols/trojan.js';
 import {
   forwardTcp,
   type ForwardTcpDeps,
   type RemoteConnWrapper,
 } from '../transports/direct.js';
-import { forwardUdpToDns, forwardTrojanUdp, type TrojanUdpContext } from '../transports/udp.js';
+import { forwardUdpToDns } from '../transports/udp.js';
 
 const DOWNSTREAM_BUFFER_LIMIT = 64 * 1024;
 const DOWNSTREAM_FLUSH_INTERVAL_MS = 20;
@@ -45,8 +44,6 @@ export async function handleGrpcRequest(
     retryConnect: null,
   };
   let isDnsQuery = false;
-  const trojanUdpCtx: TrojanUdpContext = { buffer: new Uint8Array(0) };
-  let isTrojan: boolean | null = null;
   let currentWriteSocket: any = null;
   let remoteWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
 
@@ -220,11 +217,7 @@ export async function handleGrpcRequest(
               if (!payload.byteLength) continue;
 
               if (isDnsQuery) {
-                if (isTrojan) {
-                  await forwardTrojanUdp(payload, grpcBridge as any, trojanUdpCtx, deps.log);
-                } else {
-                  await forwardUdpToDns(payload, grpcBridge as any, null, null, deps.log);
-                }
+                await forwardUdpToDns(payload, grpcBridge as any, null, null, deps.log);
                 continue;
               }
 
@@ -233,79 +226,39 @@ export async function handleGrpcRequest(
                   throw new Error('Remote socket is not ready');
                 }
               } else {
-                // First packet — identify protocol and open upstream
+                // First packet — parse VLESS frame and open upstream
                 const firstBuf = payload.buffer.slice(
                   payload.byteOffset,
                   payload.byteOffset + payload.byteLength
                 ) as ArrayBuffer;
-                const firstBytes = new Uint8Array(firstBuf);
 
-                if (isTrojan === null) {
-                  isTrojan =
-                    firstBytes.byteLength >= 58 &&
-                    firstBytes[56] === 0x0d &&
-                    firstBytes[57] === 0x0a;
+                const result = parseVlessRequest(firstBuf, yourUUID);
+                if (result.hasError) {
+                  throw new Error(result.message || 'Invalid VLESS request');
                 }
-
-                if (isTrojan) {
-                  const result = parseTrojanRequest(firstBuf, yourUUID);
-                  if (result.hasError) {
-                    throw new Error(result.message || 'Invalid trojan request');
-                  }
-                  const { port, hostname, rawClientData, isUDP } = result;
-                  deps.log(`[gRPC] trojan first: ${hostname}:${port} | UDP: ${isUDP}`);
-                  if (isSpeedTestSite(hostname)) throw new Error('Speedtest site is blocked');
-                  if (isUDP) {
-                    isDnsQuery = true;
-                    if (byteLength(rawClientData) > 0) {
-                      await forwardTrojanUdp(rawClientData as any, grpcBridge as any, trojanUdpCtx, deps.log);
-                    }
-                  } else {
-                    await forwardTcp(
-                      deps,
-                      hostname,
-                      port,
-                      new Uint8Array(rawClientData),
-                      grpcBridge as any,
-                      null,
-                      remoteConnWrapper,
-                      yourUUID
-                    );
-                  }
+                const { port, hostname, rawIndex, version, isUDP } = result;
+                deps.log(`[gRPC] vless first: ${hostname}:${port} | UDP: ${isUDP}`);
+                if (isSpeedTestSite(hostname)) throw new Error('Speedtest site is blocked');
+                if (isUDP) {
+                  if (port !== 53) throw new Error('UDP is not supported');
+                  isDnsQuery = true;
+                }
+                const respHeader = new Uint8Array([version[0], 0]);
+                grpcBridge.send(respHeader);
+                const rawData = new Uint8Array(firstBuf.slice(rawIndex));
+                if (isDnsQuery) {
+                  await forwardUdpToDns(rawData, grpcBridge as any, null, null, deps.log);
                 } else {
-                  isTrojan = false;
-                  const result = parseVlessRequest(firstBuf, yourUUID);
-                  if (result.hasError) {
-                    throw new Error(result.message || 'Invalid VLESS request');
-                  }
-                  const { port, hostname, rawIndex, version, isUDP } = result;
-                  deps.log(`[gRPC] vless first: ${hostname}:${port} | UDP: ${isUDP}`);
-                  if (isSpeedTestSite(hostname)) throw new Error('Speedtest site is blocked');
-                  if (isUDP) {
-                    if (port !== 53) throw new Error('UDP is not supported');
-                    isDnsQuery = true;
-                  }
-                  const respHeader = new Uint8Array([version[0], 0]);
-                  grpcBridge.send(respHeader);
-                  const rawData = new Uint8Array(firstBuf.slice(rawIndex));
-                  if (isDnsQuery) {
-                    if (isTrojan) {
-                      await forwardTrojanUdp(rawData, grpcBridge as any, trojanUdpCtx, deps.log);
-                    } else {
-                      await forwardUdpToDns(rawData, grpcBridge as any, null, null, deps.log);
-                    }
-                  } else {
-                    await forwardTcp(
-                      deps,
-                      hostname,
-                      port,
-                      rawData,
-                      grpcBridge as any,
-                      null,
-                      remoteConnWrapper,
-                      yourUUID
-                    );
-                  }
+                  await forwardTcp(
+                    deps,
+                    hostname,
+                    port,
+                    rawData,
+                    grpcBridge as any,
+                    null,
+                    remoteConnWrapper,
+                    yourUUID
+                  );
                 }
               }
             }

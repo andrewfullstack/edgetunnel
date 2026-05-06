@@ -82,13 +82,9 @@ export function patchClashSubscription(originalYaml: string, config: ClashConfig
   const matchesGrpcNetwork = (text: string): boolean =>
     /(?:^|[,{])\s*network:\s*(?:"grpc"|'grpc'|grpc)(?=\s*(?:[,}\n#]|$))/im.test(text);
 
-  const getNodeType = (nodeText: string): string =>
-    nodeText.match(/type:\s*(\w+)/)?.[1] || 'vl' + 'ess';
-
   const getCredentialValue = (nodeText: string, isFlowStyle: boolean): string | null => {
-    const credentialField = getNodeType(nodeText) === 'trojan' ? 'password' : 'uuid';
     const pattern = new RegExp(
-      `${credentialField}:\\s*${isFlowStyle ? '([^,}\\n]+)' : '([^\\n]+)'}`
+      `uuid:\\s*${isFlowStyle ? '([^,}\\n]+)' : '([^\\n]+)'}`
     );
     return nodeText.match(pattern)?.[1]?.trim() || null;
   };

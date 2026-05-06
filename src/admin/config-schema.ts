@@ -8,7 +8,7 @@
 // zod adds ~10KB to the bundle, and we want soft-coercion semantics (replace
 // the bad value, keep going) which is awkward with zod's parse-or-throw model.
 
-const PROTOCOLS = ['vless', 'trojan', 'ss'] as const;
+const PROTOCOLS = ['vless'] as const;
 const TRANSPORTS = ['ws', 'xhttp', 'grpc'] as const;
 const GRPC_MODES = ['gun', 'multi'] as const;
 const TLS_FRAGMENTS = ['Shadowrocket', 'Happ'] as const;
@@ -152,20 +152,6 @@ export function validateConfig(input: any): ValidationResult {
         message: `expected one of [${TLS_FRAGMENTS.join(', ')}] or null, got ${describe(c.tlsFragment)} — replaced with null`,
       });
       c.tlsFragment = null;
-    }
-  }
-
-  // ─── SS sub-object ───────────────────────────────────────────────
-  if (c.SS !== undefined && c.SS !== null) {
-    if (typeof c.SS !== 'object' || Array.isArray(c.SS)) {
-      issues.push({
-        path: 'SS',
-        message: `expected object, got ${describe(c.SS)} — replaced with default`,
-      });
-      c.SS = { cipher: 'aes-128-gcm', TLS: true };
-    } else {
-      boolField(c.SS, 'TLS', true, 'SS.TLS');
-      stringField(c.SS, 'cipher', 'aes-128-gcm', 'SS.cipher');
     }
   }
 

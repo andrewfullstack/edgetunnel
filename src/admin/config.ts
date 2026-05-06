@@ -106,7 +106,6 @@ export async function readConfigJson(
     randomPath: false,
     ECH: false,
     ECHConfig: { DNS: aliDoH, SNI: echSni },
-    SS: { cipher: 'aes-128-gcm', TLS: true },
     Fingerprint: 'chrome',
     preferredSub: {
       local: true,
@@ -195,7 +194,6 @@ export async function readConfigJson(
     configJson.PATH = '/';
   }
   if (!configJson.grpcMode) configJson.grpcMode = 'gun';
-  if (!configJson.SS) configJson.SS = { cipher: 'aes-128-gcm', TLS: false };
 
   // Backfill proxy.template if missing
   if (!configJson.proxy.template?.[PROXYIP_KEY]) {
@@ -272,18 +270,8 @@ export async function readConfigJson(
     getTransportConfig(configJson);
   const transportPathValue = getTransportPath(configJson, configJson.fullNodePath);
 
-  // Build the per-template VLESS / Trojan / SS link
-  configJson.LINK =
-    configJson.protocol === 'ss'
-      ? `${configJson.protocol}://${btoa(configJson.SS.cipher + ':' + userID)}@${host}:${configJson.SS.TLS ? '443' : '80'}?plugin=v2${encodeURIComponent(
-          `ray-plugin;mode=websocket;host=${host};path=${
-            (configJson.fullNodePath.includes('?')
-              ? configJson.fullNodePath.replace('?', '?enc=' + configJson.SS.cipher + '&')
-              : configJson.fullNodePath + '?enc=' + configJson.SS.cipher) +
-            (configJson.SS.TLS ? ';tls' : '')
-          };mux=0`
-        ) + echLinkParam}#${encodeURIComponent(configJson.preferredSub.SUBNAME)}`
-      : `${configJson.protocol}://${userID}@${host}:443?security=tls&type=${transportProto + echLinkParam}&${hostFieldName}=${host}&fp=${configJson.Fingerprint}&sni=${host}&${pathFieldName}=${encodeURIComponent(transportPathValue) + tlsFragmentParam}&encryption=none${configJson.skipCertVerify ? '&insecure=1&allowInsecure=1' : ''}#${encodeURIComponent(configJson.preferredSub.SUBNAME)}`;
+  // Build the VLESS link
+  configJson.LINK = `${configJson.protocol}://${userID}@${host}:443?security=tls&type=${transportProto + echLinkParam}&${hostFieldName}=${host}&fp=${configJson.Fingerprint}&sni=${host}&${pathFieldName}=${encodeURIComponent(transportPathValue) + tlsFragmentParam}&encryption=none${configJson.skipCertVerify ? '&insecure=1&allowInsecure=1' : ''}#${encodeURIComponent(configJson.preferredSub.SUBNAME)}`;
 
   configJson.preferredSub.TOKEN = await md5x2(hostname + userID);
 

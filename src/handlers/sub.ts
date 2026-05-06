@@ -121,10 +121,7 @@ export async function handleSubscription(
     )}`;
   }
 
-  const protoType =
-    (url.searchParams.has('surge') || uaLower.includes('surge')) && config.protocol !== 'ss'
-      ? 'tro' + 'jan'
-      : config.protocol;
+  const protoType = config.protocol;
 
   let subContent = '';
 
@@ -147,7 +144,7 @@ export async function handleSubscription(
               request as any,
               config.preferredSub.localIP.count,
               config.preferredSub.localIP.port,
-              protoType === 'ss' ? config.SS.TLS : true
+              true
             )
           )[0]
         : (await env.KV.get('ADD.txt'))
@@ -157,7 +154,7 @@ export async function handleSubscription(
                 request as any,
                 config.preferredSub.localIP.count,
                 config.preferredSub.localIP.port,
-                protoType === 'ss' ? config.SS.TLS : true
+                true
               )
             )[0];
 
@@ -208,10 +205,7 @@ export async function handleSubscription(
         }
       }
 
-      const apiResult = await requestPreferredApi(
-        apiList,
-        protoType === 'ss' && !config.SS.TLS ? '80' : '443'
-      );
+      const apiResult = await requestPreferredApi(apiList, '443');
       const mergedOtherNodes = [...new Set(otherNodes.concat(apiResult[1]))];
       otherNodeLinks =
         mergedOtherNodes.length > 0 ? mergedOtherNodes.join('\n') + '\n' : '';
@@ -248,7 +242,7 @@ export async function handleSubscription(
 
           if (match) {
             nodeAddr = match[1];
-            nodePort = match[2] || (protoType === 'ss' && !config.SS.TLS ? '80' : '443');
+            nodePort = match[2] || '443';
             nodeRemark = match[3] || nodeAddr;
           } else {
             console.warn(`[sub] invalid format ignored: ${rawAddr}`);
@@ -266,32 +260,16 @@ export async function handleSubscription(
           }
           if (isLoonOrSurge) fullPath = fullPath.replace(/,/g, '%2C');
 
-          if (protoType === 'ss' && !asPreferredSubGenerator) {
-            fullPath =
-              (fullPath.includes('?')
-                ? fullPath.replace('?', '?enc=' + config.SS.cipher + '&')
-                : fullPath + '?enc=' + config.SS.cipher
-              ).replace(/([=,])/g, '\\$1');
-            if (!isSubConverterRequest) fullPath = fullPath + ';mux=0';
-            return `${protoType}://${btoa(config.SS.cipher + ':' + PLACEHOLDER_UUID)}@${nodeAddr}:${nodePort}?plugin=v2${
-              encodeURIComponent(
-                'ray-plugin;mode=websocket;host=example.com;path=' +
-                  (config.randomPath ? randomPath(fullPath) : fullPath) +
-                  (config.SS.TLS ? ';tls' : '')
-              ) + echLinkParam + tlsFragmentParam
-            }#${encodeURIComponent(nodeRemark)}`;
-          } else {
-            const transportPathValue = getTransportPath(
-              config,
-              fullPath,
-              asPreferredSubGenerator
-            );
-            return `${protoType}://${PLACEHOLDER_UUID}@${nodeAddr}:${nodePort}?security=tls&type=${transportProto + echLinkParam}&${hostField}=example.com&fp=${config.Fingerprint}&sni=example.com&${pathField}=${
-              encodeURIComponent(transportPathValue) + tlsFragmentParam
-            }&encryption=none${
-              config.skipCertVerify ? '&insecure=1&allowInsecure=1' : ''
-            }#${encodeURIComponent(nodeRemark)}`;
-          }
+          const transportPathValue = getTransportPath(
+            config,
+            fullPath,
+            asPreferredSubGenerator
+          );
+          return `${protoType}://${PLACEHOLDER_UUID}@${nodeAddr}:${nodePort}?security=tls&type=${transportProto + echLinkParam}&${hostField}=example.com&fp=${config.Fingerprint}&sni=example.com&${pathField}=${
+            encodeURIComponent(transportPathValue) + tlsFragmentParam
+          }&encryption=none${
+            config.skipCertVerify ? '&insecure=1&allowInsecure=1' : ''
+          }#${encodeURIComponent(nodeRemark)}`;
         })
         .filter((item) => item !== null)
         .join('\n');

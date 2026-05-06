@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { readFirstPacket } from '../../src/protocols/dispatch.js';
-import { sha224 } from '../../src/crypto/sha224.js';
 
 const TEST_UUID = '550e8400-e29b-41d4-a716-446655440000';
 const TEST_UUID_BYTES = new Uint8Array([
@@ -40,19 +39,6 @@ function buildVlessFrame(): Uint8Array {
   return frame;
 }
 
-function buildTrojanFrame(password: string): Uint8Array {
-  const hashHex = sha224(password);
-  const hashBytes = new TextEncoder().encode(hashHex);
-  // Body: cmd=1 atype=1 ipv4 port=443 CRLF
-  const body = new Uint8Array([1, 1, 1, 2, 3, 4, 0x01, 0xbb, 0x0d, 0x0a]);
-  const frame = new Uint8Array(56 + 2 + body.length);
-  frame.set(hashBytes, 0);
-  frame[56] = 0x0d;
-  frame[57] = 0x0a;
-  frame.set(body, 58);
-  return frame;
-}
-
 describe('readFirstPacket', () => {
   it('detects a complete VLESS frame in a single chunk', async () => {
     const frame = buildVlessFrame();
@@ -65,20 +51,8 @@ describe('readFirstPacket', () => {
     expect(result?.port).toBe(443);
   });
 
-  it('detects a complete Trojan frame in a single chunk', async () => {
-    const frame = buildTrojanFrame(TEST_UUID); // Trojan password = userID in this project
-    const reader = makeReader([frame]);
-    const result = await readFirstPacket(reader, TEST_UUID);
-
-    expect(result).not.toBeNull();
-    expect(result?.protocol).toBe('trojan');
-    expect(result?.hostname).toBe('1.2.3.4');
-    expect(result?.port).toBe(443);
-  });
-
   it('handles a VLESS frame split across multiple chunks', async () => {
     const frame = buildVlessFrame();
-    // Split arbitrarily
     const chunks = [
       frame.slice(0, 5),
       frame.slice(5, 10),
@@ -92,8 +66,8 @@ describe('readFirstPacket', () => {
     expect(result?.hostname).toBe('1.2.3.4');
   });
 
-  it('handles a Trojan frame split byte-by-byte', async () => {
-    const frame = buildTrojanFrame(TEST_UUID);
+  it('handles a VLESS frame split byte-by-byte', async () => {
+    const frame = buildVlessFrame();
     const chunks: Uint8Array[] = [];
     for (let i = 0; i < frame.length; i++) {
       chunks.push(frame.slice(i, i + 1));
@@ -101,10 +75,10 @@ describe('readFirstPacket', () => {
     const reader = makeReader(chunks);
     const result = await readFirstPacket(reader, TEST_UUID);
 
-    expect(result?.protocol).toBe('trojan');
+    expect(result?.protocol).toBe('vless');
   });
 
-  it('returns null for invalid data (neither VLESS nor Trojan)', async () => {
+  it('returns null for invalid data', async () => {
     const garbage = new Uint8Array(200);
     crypto.getRandomValues(garbage);
     const reader = makeReader([garbage]);

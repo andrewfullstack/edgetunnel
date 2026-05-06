@@ -2,12 +2,11 @@
 //
 // XHTTP is a transport that uses standard HTTP POST + chunked response
 // streaming to tunnel proxy traffic. This handler:
-//   1. Reads the first packet to identify VLESS or Trojan
-//   2. Opens an upstream connection via forwardTcp / forwardUdpToDns / forwardTrojanUdp
+//   1. Reads the first packet as a VLESS frame
+//   2. Opens an upstream connection via forwardTcp / forwardUdpToDns
 //   3. Returns a streaming Response, with a "bridge" object mimicking
 //      WebSocket's interface so existing transport code can be reused.
 
-import { byteLength } from '../utils/bytes.js';
 import { isSpeedTestSite } from '../utils/hostname.js';
 import { readFirstPacket } from '../protocols/dispatch.js';
 import {
@@ -15,7 +14,7 @@ import {
   type ForwardTcpDeps,
   type RemoteConnWrapper,
 } from '../transports/direct.js';
-import { forwardUdpToDns, forwardTrojanUdp, type TrojanUdpContext } from '../transports/udp.js';
+import { forwardUdpToDns } from '../transports/udp.js';
 import { closeSocketQuietly } from '../transports/socket-utils.js';
 
 /**
@@ -41,7 +40,7 @@ export async function handleXhttpRequest(
     try { reader.releaseLock() } catch (e) { /* */ }
     return new Response('Forbidden', { status: 403 });
   }
-  if (firstPacket.isUDP && firstPacket.protocol !== 'trojan' && firstPacket.port !== 53) {
+  if (firstPacket.isUDP && firstPacket.port !== 53) {
     try { reader.releaseLock() } catch (e) { /* */ }
     return new Response('UDP is not supported', { status: 400 });
   }
@@ -83,8 +82,7 @@ export async function handleXhttpRequest(
     new ReadableStream<Uint8Array>({
       async start(controller) {
         let closed = false;
-        let udpRespHeader = firstPacket.respHeader;
-        const trojanUdpCtx: TrojanUdpContext = { buffer: new Uint8Array(0) };
+        let udpRespHeader: Uint8Array | null = firstPacket.respHeader;
 
         // Bridge: WebSocket-like interface that pushes into the response stream
         const xhttpBridge = {
@@ -136,11 +134,7 @@ export async function handleXhttpRequest(
           // Forward initial packet's payload (rawData)
           if (firstPacket.isUDP) {
             if (firstPacket.rawData?.byteLength) {
-              if (firstPacket.protocol === 'trojan') {
-                await forwardTrojanUdp(firstPacket.rawData, xhttpBridge as any, trojanUdpCtx, deps.log);
-              } else {
-                await forwardUdpToDns(firstPacket.rawData, xhttpBridge as any, udpRespHeader, null, deps.log);
-              }
+              await forwardUdpToDns(firstPacket.rawData, xhttpBridge as any, udpRespHeader, null, deps.log);
               udpRespHeader = null;
             }
           } else {
@@ -162,11 +156,7 @@ export async function handleXhttpRequest(
             if (done) break;
             if (!value || value.byteLength === 0) continue;
             if (firstPacket.isUDP) {
-              if (firstPacket.protocol === 'trojan') {
-                await forwardTrojanUdp(value, xhttpBridge as any, trojanUdpCtx, deps.log);
-              } else {
-                await forwardUdpToDns(value, xhttpBridge as any, udpRespHeader, null, deps.log);
-              }
+              await forwardUdpToDns(value, xhttpBridge as any, udpRespHeader, null, deps.log);
               udpRespHeader = null;
             } else {
               if (!(await writeRemote(value))) {

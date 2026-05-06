@@ -2,33 +2,26 @@
 //
 // XHTTP and gRPC don't have the WebSocket "first message" boundary —
 // bytes can arrive in arbitrarily small chunks. This dispatcher reads
-// from the request body stream and runs the VLESS and Trojan probe
-// parsers in parallel until one of them returns 'ok'. If both say
-// 'invalid', the request is rejected.
+// from the request body stream and runs the VLESS probe parser until
+// it returns 'ok'. If it says 'invalid', the request is rejected.
 
 import {
   tryParseVlessFirstPacket,
   type BufferedVlessFrame,
 } from './vless.js';
-import {
-  tryParseTrojanFirstPacket,
-  type BufferedTrojanFrame,
-} from './trojan.js';
 
-export type DispatchedFrame =
-  | (BufferedVlessFrame & { reader: ReadableStreamDefaultReader<Uint8Array> })
-  | (BufferedTrojanFrame & { reader: ReadableStreamDefaultReader<Uint8Array> });
+export type DispatchedFrame = BufferedVlessFrame & {
+  reader: ReadableStreamDefaultReader<Uint8Array>;
+};
 
 /**
- * Read the first packet from a stream and identify the protocol.
+ * Read the first packet from a stream and identify it as VLESS.
  *
  * Reads bytes from `reader`, accumulating into a buffer. After each chunk
- * arrives, tries both Trojan and VLESS parsers. Returns as soon as either
- * succeeds. If both say invalid, returns null.
+ * arrives, tries the VLESS parser. Returns as soon as it succeeds. If the
+ * parser says invalid, returns null.
  *
- * @param token - For VLESS this is the UUID string; for Trojan this is
- *                the password (parser internally hashes it).
- *                In this project the same userID is used for both.
+ * @param token - VLESS UUID string.
  */
 export async function readFirstPacket(
   reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -57,23 +50,14 @@ export async function readFirstPacket(
     offset += chunk.byteLength;
     const current = buffer.subarray(0, offset);
 
-    // Try Trojan first (matches original ordering — Trojan has stricter prefix
-    // requirements so it short-circuits faster on non-Trojan input).
-    const trojan = tryParseTrojanFirstPacket(current, token);
-    if (trojan.status === 'ok') return { ...trojan.result, reader };
-
     const vless = tryParseVlessFirstPacket(current, token);
     if (vless.status === 'ok') return { ...vless.result, reader };
-
-    // Both definitely-invalid → bail.
-    if (trojan.status === 'invalid' && vless.status === 'invalid') return null;
-    // Otherwise (at least one says 'need_more') keep reading.
+    if (vless.status === 'invalid') return null;
+    // 'need_more' → keep reading.
   }
 
   // Stream ended; one final attempt with whatever we have.
   const finalBuffer = buffer.subarray(0, offset);
-  const trojan = tryParseTrojanFirstPacket(finalBuffer, token);
-  if (trojan.status === 'ok') return { ...trojan.result, reader };
   const vless = tryParseVlessFirstPacket(finalBuffer, token);
   if (vless.status === 'ok') return { ...vless.result, reader };
   return null;

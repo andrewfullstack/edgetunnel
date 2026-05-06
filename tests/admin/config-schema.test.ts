@@ -43,7 +43,6 @@ describe('validateConfig', () => {
         Fingerprint: 'chrome',
         HOSTS: ['example.com'],
         tlsFragment: null,
-        SS: { cipher: 'aes-128-gcm', TLS: true },
         preferredSub: {
           local: true,
           SUBUpdateTime: 6,
@@ -164,26 +163,6 @@ describe('validateConfig', () => {
     });
   });
 
-  describe('SS sub-object', () => {
-    it('replaces non-object SS with default', () => {
-      const { config, issues } = validateConfig({ SS: 'invalid' });
-      expect(config.SS).toEqual({ cipher: 'aes-128-gcm', TLS: true });
-      expect(issues[0].path).toBe('SS');
-    });
-
-    it('coerces SS.TLS non-boolean', () => {
-      const { config, issues } = validateConfig({ SS: { TLS: 'yes' } });
-      expect(config.SS.TLS).toBe(true);
-      expect(issues[0].path).toBe('SS.TLS');
-    });
-
-    it('coerces SS.cipher non-string', () => {
-      const { config, issues } = validateConfig({ SS: { cipher: 42 } });
-      expect(config.SS.cipher).toBe('aes-128-gcm');
-      expect(issues[0].path).toBe('SS.cipher');
-    });
-  });
-
   describe('preferredSub sub-object', () => {
     it('reports issue when preferredSub is not an object', () => {
       const { issues } = validateConfig({ preferredSub: 'oops' });
@@ -245,21 +224,18 @@ describe('validateConfig', () => {
         transport: 'tcp',
         enable0RTT: 'yes',
         HOSTS: 42,
-        SS: { TLS: 'maybe' },
       });
-      expect(issues.length).toBeGreaterThanOrEqual(5);
+      expect(issues.length).toBeGreaterThanOrEqual(4);
       const paths = issues.map((i) => i.path);
       expect(paths).toContain('protocol');
       expect(paths).toContain('transport');
       expect(paths).toContain('enable0RTT');
       expect(paths).toContain('HOSTS');
-      expect(paths).toContain('SS.TLS');
       // and config should have all the corrected defaults
       expect(config.protocol).toBe('vless');
       expect(config.transport).toBe('ws');
       expect(config.enable0RTT).toBe(false);
       expect(config.HOSTS).toEqual([]);
-      expect(config.SS.TLS).toBe(true);
     });
 
     it('mutates the input in place (same reference returned)', () => {
