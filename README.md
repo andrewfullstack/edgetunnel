@@ -44,18 +44,30 @@ better tools for that environment.
 
 You need a Cloudflare account and a domain (Cloudflare DNS, free is fine).
 
-### Cloudflare Pages (zip upload) — recommended
+### Cloudflare Pages (zip upload) — recommended ✅ tested
 
 The most reliable path — the Workers dashboard's "paste-deploy" can
 mis-classify the project as static-assets-only and refuse to let you add
 environment variables. Pages doesn't have that problem.
 
-1. Download [`main.zip`](https://github.com/cmliu/edgetunnel/archive/refs/heads/main.zip).
-2. **Pages dashboard → Upload assets** → name the project → upload zip.
-3. **Settings → Environment variables**: add `ADMIN`. Re-deploy.
-4. **Settings → Bindings**: add KV namespace named `KV`.
-5. **Custom domains**: bind a CNAME subdomain.
-6. Visit `/admin` and log in.
+1. **Get a zip with `_worker.js`.** Two equivalent options:
+   - **Quick**: download the [auto-generated `main.zip`](https://github.com/cmliu/edgetunnel/archive/refs/heads/main.zip)
+     from GitHub. Contains the whole repo (~MB-scale); Pages uses
+     `_worker.js` and ignores everything else.
+   - **Minimal**: build a one-file zip yourself: `zip main.zip _worker.js`
+     (~80 KB). Same end result.
+2. **Pages dashboard → Create → Pages tab → Upload assets** → name the
+   project → upload the zip → **Deploy site**.
+3. **Settings → Environment variables → Production** → add `ADMIN` =
+   your admin password → **Save**.
+4. Go back to **Deployments** → **Create new deployment** → re-upload
+   the same zip → **Save and deploy**. (This step is required for the
+   env var to take effect on the running deployment.)
+5. **Settings → Bindings → KV namespace** → add binding with variable
+   name `KV` → save → re-deploy once more.
+6. **Custom domains** → bind a CNAME subdomain (note: don't use the
+   apex; use a subdomain like `vless.your-domain.com`).
+7. Visit `https://<your-subdomain>/admin` and log in with `ADMIN`.
 
 ### Cloudflare Pages (GitHub-connected)
 
@@ -100,6 +112,30 @@ under **Triggers → Custom Domain**.
 4. **Settings → Bindings**: add KV namespace named `KV`.
 5. **Triggers → Custom Domain**: bind a subdomain.
 6. Visit `https://<your-domain>/admin` and log in.
+
+### Verifying the deployment
+
+After binding the custom domain and DNS has propagated:
+
+1. **`/admin`** loads — confirms the Worker is running and the `ADMIN`
+   env var is plumbed in.
+2. **`/admin/validation.json`** returns `{"ok": true, "count": 0}` —
+   confirms the KV binding is correct and there's no schema problem.
+   If `ok` is false, the admin panel will also show a yellow banner
+   listing the issues.
+3. **Subscription URL** — copy from the admin panel, paste into your
+   client (Clash / Sing-box / Surge), confirm nodes show up.
+4. **Real connection** — connect through one of the nodes, hit
+   `https://ifconfig.me` or similar, confirm the IP is a Cloudflare
+   address (proving traffic actually flowed through the worker).
+5. **`wrangler tail <project-name>`** (optional) — streams `console.log`
+   from the deployed worker. Useful for debugging issues you can't see
+   from the client side.
+
+If `/admin` shows a yellow banner ("⚠️ Config has N validation issues"),
+visit `/admin/validation.json` for the full list of what's wrong with
+your KV config; the validator coerces bad fields to defaults and keeps
+serving, so the worker still works while you fix things.
 
 ## Configuration
 
