@@ -224,6 +224,45 @@ utils/         50 个测试  bytes、url、hostname、path、log
 
 需要部署到 Cloudflare Workers 做集成测试验证。
 
+## Bundle 大小分析
+
+`_worker.js` 当前约 **232 KB**（CF Workers 免费版上限 1 MB unzipped，使用率约 23%）。CI 已设硬上限 900 KB；当 bundle 接近这个值时再考虑下面的优化。
+
+随时运行 `npm run analyze` 可获取最新的逐模块 size breakdown（基于 esbuild metafile）。
+
+### 当前贡献 Top 10（截至 2026-05）
+
+| 模块 | 大小 | 备注 |
+|---|---|---|
+| `crypto/tls-client.ts` | 25.7 KB | 出站 TLS 客户端，**仅** `socks5Mode === 'https'` 路径调用 |
+| `subscription/singbox.ts` | 13.5 KB | 仅 `/sub` 路径调用 |
+| `handlers/sub.ts` | 10.8 KB | 订阅入口；仅 `/sub` |
+| `admin/config.ts` | 10.4 KB | KV CRUD，仅 `/admin` |
+| `handlers/grpc.ts` | 10.2 KB | 数据面热路径 |
+| `admin/preferred-sub.ts` | 10.0 KB | 仅 `/admin` |
+| `handlers/ss-inbound.ts` | 9.4 KB | 数据面热路径（SS 协议） |
+| `handlers/websocket.ts` | 9.0 KB | 数据面热路径 |
+| `subscription/clash.ts` | 8.1 KB | 仅 `/sub` |
+
+### 分组(粗略)
+
+- **数据面热路径**(始终需要): handlers/transports/protocols 大部分 + 必需 crypto ≈ 95 KB
+- **冷路径**(请求时才命中): admin UI ≈ 25 KB · 订阅生成 ≈ 23 KB · TLS 客户端 ≈ 35 KB
+
+### 未来 lazy-load / WORKER_LITE 路线（**仅在真到 size pressure 时再做**）
+
+如果 bundle 增长到接近 1 MB(例如新增 REALITY-style 协议、AEAD-2022、内嵌静态资源等),按 **冷路径优先** 的顺序剥离:
+
+1. **TLS 客户端家族**(`tls-client` + `tls-messages` + `tls-record` ≈ 35 KB)。绝大多数用户 `socks5Mode` 不是 `'https'`,可通过 esbuild `alias` 把 `transports/https-proxy.ts` 在 `WORKER_LITE` 模式下指向 stub,运行时若真的命中再返回明确错误。
+2. **订阅系统**(`handlers/sub.ts` + `subscription/* ≈ 33 KB`)。如果用户只用单节点不需要订阅,完全可剥离。
+3. **Admin UI**(`handlers/admin.ts` + `admin/pages.ts` + `admin/preferred-sub.ts` + `admin/cloudflare-api.ts` ≈ 25 KB)。极简部署可直接禁用 `/admin`,通过环境变量配 UUID。
+
+#### 实现注意事项
+
+- esbuild `bundle: true` **不会**通过 dynamic `import()` 实现真正的 size 节省 —— 静态导入还是会被 inlining,代码分割只在 `splitting: true` 多文件输出下生效,而项目部署形态(单文件 `_worker.js`)不允许多文件。
+- 因此正确的剥离方式是 **build-time aliasing**:`alias` 把重模块换成 stub,esbuild DCE 会把整个子图剔除。
+- WORKER_LITE 是 cross-cutting change,**当前没有 size pressure 时不要做**,会引入测试矩阵翻倍(全功能 + lite 双模)和回归风险。
+
 ## 重要注意事项
 
 1. **原始单文件保存在初始提交里**。`_worker.original.js` 已从工作树移除（避免每次构建产物提交时的 noisy diff），但作为 4619 行原始代码的"原貌"快照保存在初始提交 `8de49df` 里。需要查阅或 diff 时：

@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "build": "node build.mjs",
+    "analyze": "node build-analyze.mjs",
     "dev": "wrangler dev",
     "deploy": "npm run build && wrangler deploy",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
