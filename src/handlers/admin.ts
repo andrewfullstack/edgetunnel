@@ -248,5 +248,28 @@ export async function handleAdmin(
   workerCtx.waitUntil(
     logRequest(env, request as any, accessIP, 'Admin_Login', config)
   );
-  return fetch(PAGES_STATIC_URL + '/admin' + url.search) as any;
+
+  const upstream = await fetch(PAGES_STATIC_URL + '/admin' + url.search);
+  const issueCount = Array.isArray(config.__validation?.issues)
+    ? config.__validation.issues.length
+    : 0;
+
+  // Inject a banner if KV config has structural issues. The admin SPA
+  // is hosted off-repo, so we can't ship a proper React component into
+  // it — instead use HTMLRewriter (a Workers runtime built-in) to
+  // prepend a self-contained banner to <body>. Visible immediately on
+  // first paint; SPAs that re-render the body will lose it (acceptable
+  // tradeoff for a non-fatal warning).
+  if (issueCount > 0) {
+    const banner = `<div style="position:sticky;top:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#664d03;border-bottom:1px solid #ffe69c;font:14px/1.4 system-ui,-apple-system,sans-serif">⚠️ Config has ${issueCount} validation issue${issueCount === 1 ? '' : 's'}. Details: <a href="/admin/validation.json" style="color:#664d03;text-decoration:underline">/admin/validation.json</a></div>`;
+    return new HTMLRewriter()
+      .on('body', {
+        element(el) {
+          el.prepend(banner, { html: true });
+        },
+      })
+      .transform(upstream);
+  }
+
+  return upstream;
 }

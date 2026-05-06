@@ -121,6 +121,41 @@ export async function handleSubscription(
     )}`;
   }
 
+  // ─── Subscription cache (5-minute TTL) ────────────────────────────
+  // Reduces CPU on the regular 6-hour client refresh waves. Skip when
+  // an external generator (?sub=) is involved (its content varies)
+  // or when ?nocache is explicitly set. The dynamic headers
+  // (Subscription-Userinfo with usage stats) are recomputed each call,
+  // so cache only stores body + content-type/disposition.
+  const skipCache =
+    url.searchParams.has('nocache') ||
+    url.searchParams.has('sub') ||
+    asPreferredSubGenerator;
+  const cacheKeyHash = await md5x2(
+    subType + ':' + url.search + ':' + (uaLower.includes('mozilla') ? '1' : '0')
+  );
+  const cacheKey = `subcache:${subToken}:${cacheKeyHash}`;
+
+  if (!skipCache) {
+    try {
+      const cached = await env.KV.get(cacheKey);
+      if (cached) {
+        const entry = JSON.parse(cached) as {
+          body: string;
+          contentType?: string;
+          contentDisposition?: string;
+        };
+        if (entry.contentType) responseHeaders['content-type'] = entry.contentType;
+        if (entry.contentDisposition) {
+          responseHeaders['Content-Disposition'] = entry.contentDisposition;
+        }
+        return new Response(entry.body, { status: 200, headers: responseHeaders });
+      }
+    } catch (e) {
+      // Cache read failed — fall through to regenerate.
+    }
+  }
+
   const protoType = config.protocol;
 
   let subContent = '';
@@ -337,6 +372,21 @@ export async function handleSubscription(
   } else if (subType === 'clash') {
     subContent = patchClashSubscription(subContent, config);
     responseHeaders['content-type'] = 'application/x-yaml; charset=utf-8';
+  }
+
+  // Persist to cache (best-effort; failure doesn't block the response).
+  if (!skipCache && subContent) {
+    workerCtx.waitUntil(
+      env.KV.put(
+        cacheKey,
+        JSON.stringify({
+          body: subContent,
+          contentType: responseHeaders['content-type'],
+          contentDisposition: responseHeaders['Content-Disposition'],
+        }),
+        { expirationTtl: 300 }
+      ).catch(() => {})
+    );
   }
 
   return new Response(subContent, { status: 200, headers: responseHeaders });
