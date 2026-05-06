@@ -165,7 +165,14 @@ export default {
     }
 
     // ─── HTTP redirect to HTTPS ─────────────────────────────────────
-    if (url.protocol === 'http:') {
+    // Skip for local dev hostnames: wrangler dev binds to localhost/127.0.0.1,
+    // and `unstable_dev` (used by integration tests) uses 'placeholder'.
+    if (
+      url.protocol === 'http:' &&
+      url.hostname !== 'localhost' &&
+      url.hostname !== '127.0.0.1' &&
+      url.hostname !== 'placeholder'
+    ) {
       return Response.redirect(
         url.href.replace(`http://${url.hostname}`, `https://${url.hostname}`),
         301

@@ -32,8 +32,11 @@ jobs:
       - name: Type check (tsc --noEmit)
         run: npm run lint
 
-      - name: Run tests
+      - name: Run unit tests
         run: npm test
+
+      - name: Run integration tests
+        run: npm run test:integration
 
       - name: Snapshot committed _worker.js
         id: snapshot

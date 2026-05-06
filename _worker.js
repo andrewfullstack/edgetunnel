@@ -6489,7 +6489,7 @@ var src_default = {
       log(`[XHTTP] hit: ${url.pathname}${url.search}`);
       return await handleXhttpRequest(tcpDeps, request, userID);
     }
-    if (url.protocol === "http:") {
+    if (url.protocol === "http:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1" && url.hostname !== "placeholder") {
       return Response.redirect(
         url.href.replace(`http://${url.hostname}`, `https://${url.hostname}`),
         301

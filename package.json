@@ -12,7 +12,9 @@
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "npm run build && vitest run --config vitest.config.integration.ts",
+    "test:all": "npm run test && npm run test:integration"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240620.0",
