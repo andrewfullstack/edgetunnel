@@ -2,8 +2,12 @@
 
 [中文版本 / Chinese version →](./README.zh.md)
 
-
 A VLESS proxy that runs on Cloudflare Workers / Pages.
+
+📦 **Just want to deploy?** Grab `edgetunnel.zip` from the
+[Releases page](https://github.com/andrewfullstack/edgetunnel/releases)
+and follow [Cloudflare Pages (zip upload)](#cloudflare-pages-zip-upload--recommended--tested)
+below.
 
 This is a TypeScript refactor of [`cmliu/edgetunnel`](https://github.com/cmliu/edgetunnel).
 The upstream project is one 4619-line `_worker.js` with Chinese identifiers
@@ -50,20 +54,15 @@ The most reliable path — the Workers dashboard's "paste-deploy" can
 mis-classify the project as static-assets-only and refuse to let you add
 environment variables. Pages doesn't have that problem.
 
-1. **Get a zip with `_worker.js`.** Three equivalent options, in order of preference:
-   - **Release `edgetunnel.zip` (recommended)**: download from the
-     [Releases page](https://github.com/andrewfullstack/edgetunnel/releases)
-     of this fork. Each tagged release publishes `edgetunnel.zip`
-     containing just the built `_worker.js` (~80 KB). One click, ready
-     to upload.
-   - **Build it locally**: `npm run build && zip edgetunnel.zip _worker.js`
-     (~80 KB). Equivalent to what the release workflow ships.
-   - **Auto-zip of the repo**: the [auto-generated `main.zip`](https://github.com/andrewfullstack/edgetunnel/archive/refs/heads/main.zip)
-     (named `main.zip` by GitHub after the branch name) contains the
-     whole repo (~MB-scale); Pages uses `_worker.js` and ignores
-     everything else. Works but wasteful. **Don't use the upstream
-     `cmliu/edgetunnel` zip — its `_worker.js` is the original
-     pre-refactor 4619-line file, not what this fork's docs describe.**
+1. **Get `edgetunnel.zip`.** Either:
+   - Download it from the [Releases page](https://github.com/andrewfullstack/edgetunnel/releases)
+     (recommended — built, tested, and signed by CI on every tag), or
+   - Build it locally: `npm run build && zip edgetunnel.zip _worker.js`.
+
+   Either way, the zip contains a single `_worker.js` (~80 KB) at the
+   root. **Don't use the upstream `cmliu/edgetunnel` archive — its
+   `_worker.js` is the original pre-refactor 4619-line file, not what
+   this fork's docs describe.**
 2. **Pages dashboard → Create → Pages tab → Upload assets** → name the
    project → upload the zip → **Deploy site**.
 3. **Settings → Environment variables → Production** → add `ADMIN` =
