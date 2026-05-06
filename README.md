@@ -44,16 +44,11 @@ better tools for that environment.
 
 You need a Cloudflare account and a domain (Cloudflare DNS, free is fine).
 
-### Cloudflare Workers (paste-deploy)
+### Cloudflare Pages (zip upload) — recommended
 
-1. Create a new Worker in the Cloudflare dashboard.
-2. Paste the contents of [`_worker.js`](./_worker.js) into the editor.
-3. **Settings → Variables**: add `ADMIN` = your chosen admin password.
-4. **Bindings**: add a KV namespace binding named `KV`.
-5. **Triggers → Custom Domain**: bind a subdomain.
-6. Visit `https://<your-domain>/admin` and log in with `ADMIN`.
-
-### Cloudflare Pages (zip upload)
+The most reliable path — the Workers dashboard's "paste-deploy" can
+mis-classify the project as static-assets-only and refuse to let you add
+environment variables. Pages doesn't have that problem.
 
 1. Download [`main.zip`](https://github.com/cmliu/edgetunnel/archive/refs/heads/main.zip).
 2. **Pages dashboard → Upload assets** → name the project → upload zip.
@@ -67,6 +62,44 @@ You need a Cloudflare account and a domain (Cloudflare DNS, free is fine).
 1. Fork this repo.
 2. **Pages → Connect to Git** → select your fork → set `ADMIN` env var.
 3. Add KV binding and custom domain as above.
+
+### Cloudflare Workers (CLI deploy via wrangler)
+
+Most reliable Workers path; avoids the dashboard's static-assets
+classification trap.
+
+```bash
+npm install
+npx wrangler login
+npx wrangler secret put ADMIN          # paste your admin password
+npx wrangler kv namespace create KV    # note the id from the output
+# Add the KV binding to wrangler.toml:
+#   [[kv_namespaces]]
+#   binding = "KV"
+#   id = "<id-from-the-create-output>"
+npm run deploy
+```
+
+Then in the Cloudflare dashboard, bind a custom domain to the worker
+under **Triggers → Custom Domain**.
+
+### Cloudflare Workers (dashboard paste) — see warning
+
+> ⚠️ Cloudflare's new dashboard sometimes classifies a paste-deployed
+> Worker as "static assets only" and then refuses to let you add
+> environment variables (error: *"Variables cannot be added to a
+> Worker that only has static assets"*). If you hit this, **delete the
+> Worker and use one of the paths above**.
+
+1. **Workers & Pages → Create → Workers tab → Hello World template →
+   Deploy.** (Don't use other "create" paths — they may upload your
+   code as static assets.)
+2. Open the Worker → **Edit Code** → replace the entire content with
+   the contents of [`_worker.js`](./_worker.js) → **Save and Deploy**.
+3. **Settings → Variables**: add `ADMIN` = your admin password.
+4. **Settings → Bindings**: add KV namespace named `KV`.
+5. **Triggers → Custom Domain**: bind a subdomain.
+6. Visit `https://<your-domain>/admin` and log in.
 
 ## Configuration
 
