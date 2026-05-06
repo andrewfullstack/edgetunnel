@@ -133,7 +133,6 @@ export async function readConfigJson(
         [PROXYIP_KEY]: 'proxyip=' + placeholder,
         SOCKS5: { global: 'socks5://' + placeholder, standard: 'socks5=' + placeholder },
         HTTP: { global: 'http://' + placeholder, standard: 'http=' + placeholder },
-        HTTPS: { global: 'https://' + placeholder, standard: 'https=' + placeholder },
       },
     },
     TG: { enabled: false, BotToken: null, ChatID: null },
@@ -201,12 +200,6 @@ export async function readConfigJson(
       [PROXYIP_KEY]: 'proxyip=' + placeholder,
       SOCKS5: { global: 'socks5://' + placeholder, standard: 'socks5=' + placeholder },
       HTTP: { global: 'http://' + placeholder, standard: 'http=' + placeholder },
-    };
-  }
-  if (!configJson.proxy.template.HTTPS) {
-    configJson.proxy.template.HTTPS = {
-      global: 'https://' + placeholder,
-      standard: 'https=' + placeholder,
     };
   }
 

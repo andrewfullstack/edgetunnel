@@ -29,7 +29,6 @@ import { handleGrpcRequest } from './handlers/grpc.js';
 import { handleXhttpRequest } from './handlers/xhttp.js';
 import { parseProxyParams } from './admin/proxy-resolver.js';
 import { parseAddressPort } from './admin/parse-address.js';
-import { httpsConnect } from './transports/https-proxy.js';
 import { nginx, html1101 } from './admin/pages.js';
 import type { ForwardTcpDeps } from './transports/direct.js';
 
@@ -124,7 +123,6 @@ export default {
       log,
       resolveProxyIPs: (proxyIP, target, uuid) =>
         parseAddressPort(ctx, proxyIP, target, uuid, log),
-      httpsConnect: (c, h, p, d) => httpsConnect(c, h, p, d, log),
     };
 
     // ─── Version endpoint ───────────────────────────────────────────

@@ -17,7 +17,6 @@
 
 import { connect } from 'cloudflare:sockets';
 import { byteLength } from '../utils/bytes.js';
-import { isIPHostname } from '../utils/hostname.js';
 import type { LogFn } from '../utils/logger.js';
 import type { ProxyContext } from '../state.js';
 import { socks5Connect } from './socks5.js';
@@ -52,24 +51,11 @@ export type ProxyResolver = (
   uuid: string
 ) => Promise<ProxyIPArray>;
 
-/**
- * HTTPS-CONNECT (TLS-wrapped HTTP CONNECT) implementation.
- * Pulled in via callback because it depends on the TlsClient (Phase 4).
- */
-export type HttpsConnectFn = (
-  ctx: ProxyContext,
-  targetHost: string,
-  targetPort: number,
-  initialData: Uint8Array | null
-) => Promise<any>;
-
 export interface ForwardTcpDeps {
   ctx: ProxyContext;
   log: LogFn;
   /** Resolves proxyIP to round-robin list. Required. */
   resolveProxyIPs: ProxyResolver;
-  /** Optional HTTPS-CONNECT impl. If absent, 'https' mode is unsupported. */
-  httpsConnect?: HttpsConnectFn;
 }
 
 /**
@@ -164,7 +150,7 @@ export async function forwardTcp(
   remoteConnWrapper: RemoteConnWrapper,
   yourUUID: string
 ): Promise<void> {
-  const { ctx, log, resolveProxyIPs, httpsConnect: httpsConnectImpl } = deps;
+  const { ctx, log, resolveProxyIPs } = deps;
   log(
     `[TCP] target: ${host}:${portNum} | proxyIP: ${ctx.proxyIP} | fallback: ${ctx.proxyFallbackEnabled ? 'yes' : 'no'} | mode: ${ctx.socks5Mode || 'proxyip'} | global: ${ctx.socks5GlobalEnabled ? 'yes' : 'no'}`
   );
@@ -190,14 +176,6 @@ export async function forwardTcp(
       } else if (ctx.socks5Mode === 'http') {
         log(`[HTTP-CONNECT] forwarding to: ${host}:${portNum}`);
         newSocket = await httpConnect(ctx, host, portNum, firstPacketData);
-      } else if ((ctx.socks5Mode as unknown as string) === 'https') {
-        log(`[HTTPS-CONNECT] forwarding to: ${host}:${portNum}`);
-        if (!httpsConnectImpl) {
-          throw new Error('HTTPS-CONNECT not configured (Phase 4 dependency)');
-        }
-        newSocket = isIPHostname(ctx.parsedSocks5.hostname)
-          ? await httpsConnectImpl(ctx, host, portNum, firstPacketData)
-          : await httpConnect(ctx, host, portNum, firstPacketData, true);
       } else {
         log(`[proxyIP] forwarding to: ${host}:${portNum}`);
         const proxyArray = await resolveProxyIPs(ctx.proxyIP, host, yourUUID);

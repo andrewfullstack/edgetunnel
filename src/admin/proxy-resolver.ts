@@ -101,15 +101,13 @@ export async function parseProxyParams(ctx: ProxyContext, url: URL): Promise<voi
   ctx.socks5Auth =
     searchParams.get('socks5') ||
     searchParams.get('http') ||
-    searchParams.get('https') ||
     '';
   ctx.socks5GlobalEnabled = searchParams.has('globalproxy');
   if (searchParams.get('socks5')) ctx.socks5Mode = 'socks5';
   else if (searchParams.get('http')) ctx.socks5Mode = 'http';
-  else if (searchParams.get('https')) (ctx.socks5Mode as any) = 'https';
 
   const parseProxyURL = (value: string, forceGlobal: boolean = true): boolean => {
-    const match = /^(socks5|http|https):\/\/(.+)$/i.exec(value || '');
+    const match = /^(socks5|http):\/\/(.+)$/i.exec(value || '');
     if (!match) return false;
     (ctx.socks5Mode as any) = match[1].toLowerCase();
     ctx.socks5Auth = match[2].split('/')[0];
@@ -142,20 +140,15 @@ export async function parseProxyParams(ctx: ProxyContext, url: URL): Promise<voi
     }
   } else {
     let match: RegExpExecArray | null;
-    if ((match = /\/(socks5?|http|https):\/?\/?([^/?#\s]+)/i.exec(pathname))) {
+    if ((match = /\/(socks5?|http):\/?\/?([^/?#\s]+)/i.exec(pathname))) {
       const type = match[1].toLowerCase();
-      (ctx.socks5Mode as any) =
-        type === 'http' ? 'http' : type === 'https' ? 'https' : 'socks5';
+      (ctx.socks5Mode as any) = type === 'http' ? 'http' : 'socks5';
       ctx.socks5Auth = match[2].split('/')[0];
       ctx.socks5GlobalEnabled = true;
-    } else if ((match = /\/(g?s5|socks5|g?http|g?https)=([^/?#\s]+)/i.exec(pathname))) {
+    } else if ((match = /\/(g?s5|socks5|g?http)=([^/?#\s]+)/i.exec(pathname))) {
       const type = match[1].toLowerCase();
       ctx.socks5Auth = match[2].split('/')[0];
-      (ctx.socks5Mode as any) = type.includes('https')
-        ? 'https'
-        : type.includes('http')
-          ? 'http'
-          : 'socks5';
+      (ctx.socks5Mode as any) = type.includes('http') ? 'http' : 'socks5';
       if (type.startsWith('g')) ctx.socks5GlobalEnabled = true;
     } else if ((match = /\/(proxyip[.=]|pyip=|ip=)([^?#\s]+)/.exec(pathLower))) {
       const pathProxyValue = extractPathValue(match[2]);
@@ -172,13 +165,9 @@ export async function parseProxyParams(ctx: ProxyContext, url: URL): Promise<voi
   }
 
   try {
-    ctx.parsedSocks5 = parseSocks5Auth(
-      ctx.socks5Auth,
-      (ctx.socks5Mode as any) === 'https' ? 443 : 80
-    );
+    ctx.parsedSocks5 = parseSocks5Auth(ctx.socks5Auth, 80);
     if (searchParams.get('socks5')) ctx.socks5Mode = 'socks5';
     else if (searchParams.get('http')) ctx.socks5Mode = 'http';
-    else if (searchParams.get('https')) (ctx.socks5Mode as any) = 'https';
     else (ctx.socks5Mode as any) = ctx.socks5Mode || 'socks5';
   } catch (err: any) {
     console.error('parseProxyParams: socks5 auth parse failed:', err.message);
