@@ -50,6 +50,14 @@ const SCOPED_MIGRATION: Record<string, Record<string, string>> = {
   SOCKS5: { '启用': 'mode' },
 };
 
+const SCHEMA_MIGRATION_REVERSE: Record<string, string> = Object.fromEntries(
+  Object.entries(SCHEMA_MIGRATION).map(([oldKey, newKey]) => [newKey, oldKey])
+);
+const SCOPED_MIGRATION_REVERSE: Record<string, Record<string, string>> = {
+  TG: { 'enabled': '启用' },
+  SOCKS5: { 'mode': '启用' },
+};
+
 /** Recursively rename legacy Chinese keys to the new English schema. */
 function migrateLegacySchema(value: any, parentKey: string = ''): any {
   if (Array.isArray(value)) return value.map((v) => migrateLegacySchema(v, ''));
@@ -59,6 +67,25 @@ function migrateLegacySchema(value: any, parentKey: string = ''): any {
   for (const [k, v] of Object.entries(value)) {
     const newKey = scoped?.[k] ?? SCHEMA_MIGRATION[k] ?? k;
     out[newKey] = migrateLegacySchema(v, newKey);
+  }
+  return out;
+}
+
+/**
+ * Inverse of migrateLegacySchema — rename English keys back to the legacy
+ * Chinese schema. Storage is kept in the English schema, but the off-repo
+ * admin SPA at PAGES_STATIC_URL still reads the legacy keys (优选订阅生成,
+ * 反代, 订阅转换配置, …); without this reshape its form fields show up
+ * undefined (notably the /sub?token= link).
+ */
+export function toLegacySchema(value: any, parentKey: string = ''): any {
+  if (Array.isArray(value)) return value.map((v) => toLegacySchema(v, ''));
+  if (!value || typeof value !== 'object') return value;
+  const out: Record<string, any> = {};
+  const scoped = SCOPED_MIGRATION_REVERSE[parentKey];
+  for (const [k, v] of Object.entries(value)) {
+    const oldKey = scoped?.[k] ?? SCHEMA_MIGRATION_REVERSE[k] ?? k;
+    out[oldKey] = toLegacySchema(v, k);
   }
   return out;
 }

@@ -5,7 +5,7 @@
 // or a metadata endpoint (log.json, getCloudflareUsage, etc.).
 
 import { logRequest } from '../utils/log.js';
-import { readConfigJson } from '../admin/config.js';
+import { readConfigJson, toLegacySchema } from '../admin/config.js';
 import { getCloudflareUsage } from '../admin/cloudflare-api.js';
 import { generateRandomIPs } from '../admin/random-ip.js';
 import { requestPreferredApi } from '../admin/preferred-sub.js';
@@ -206,7 +206,9 @@ export async function handleAdmin(
     const issueCount = Array.isArray(config.__validation?.issues)
       ? config.__validation.issues.length
       : 0;
-    return new Response(JSON.stringify(config, null, 2), {
+    // Reshape to the legacy Chinese-keyed schema the off-repo admin SPA
+    // still reads (e.g. 优选订阅生成.TOKEN drives the /sub?token= link).
+    return new Response(JSON.stringify(toLegacySchema(config), null, 2), {
       status: 200,
       headers: {
         'Content-Type': 'application/json;charset=utf-8',
