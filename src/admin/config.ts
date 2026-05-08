@@ -97,6 +97,26 @@ interface ConfigEnv {
 }
 
 /**
+ * Drop stale `*.pages.dev` auto-hashes from a HOSTS list and ensure the
+ * active hostname is present. Pages assigns each deployment a fresh preview
+ * hash (`<hash>.<project>.pages.dev`), but KV is shared across deployments,
+ * so a redeploy leaves the old hash baked into HOSTS — and subscription
+ * generation then injects a dead SNI/Host into every VLESS node, making
+ * proxies unreachable once CF reaps the old preview.
+ *
+ * Only applied when `env.HOST` isn't pinning the list (admin POSTs and
+ * env-pinned lists win). User-configured non-pages.dev custom domains are
+ * preserved.
+ */
+export function healHostsForRedeploy(hosts: unknown, hostname: string): string[] {
+  const filtered = (Array.isArray(hosts) ? hosts : []).filter(
+    (h: unknown): h is string =>
+      typeof h === 'string' && (h === hostname || !/\.pages\.dev$/i.test(h))
+  );
+  return filtered.includes(hostname) ? filtered : [hostname, ...filtered];
+}
+
+/**
  * Read (or create) config.json from KV, populate derived fields, and
  * return the unified subscription config.
  *
@@ -209,6 +229,8 @@ export async function readConfigJson(
     configJson.HOSTS = toArray(env.HOST).map((h) =>
       h.toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0]
     );
+  } else {
+    configJson.HOSTS = healHostsForRedeploy(configJson.HOSTS, hostname);
   }
   configJson.UUID = userID;
   if (!configJson.randomPath) configJson.randomPath = false;

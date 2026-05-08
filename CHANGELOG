@@ -1,3 +1,9 @@
+## [2.2.2] - 2026-05-08
+
+### Debug
+
+- 修复 Cloudflare Pages 重新部署后订阅链接中 `host` / `sni` 仍指向旧预览哈希的问题。Pages 每次部署会分配新的 `<hash>.<project>.pages.dev`，但 KV 在部署间共享，导致旧哈希残留在 `HOSTS` 中并被烘焙进每个 VLESS 节点的 SNI / Host header；旧预览被 CF 回收后所有节点同时失联。新增 `healHostsForRedeploy()`：当 `env.HOST` 未固定列表时，自动剔除与当前主机不匹配的 `*.pages.dev` 残留，并确保当前主机在列表中。env.HOST / 自定义域名配置不受影响。
+
 ## [2.2.1] - 2026-05-08
 
 ### Debug
