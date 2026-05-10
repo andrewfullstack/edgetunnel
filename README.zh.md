@@ -1,283 +1,215 @@
-# 🚀 edgetunnel 2.1
+# edgetunnel
 
 [English version →](./README.md)
 
-[![Stars](https://img.shields.io/github/stars/cmliu/edgetunnel?style=flat-square&logo=github)](https://github.com/cmliu/edgetunnel/stargazers)
-[![Forks](https://img.shields.io/github/forks/cmliu/edgetunnel?style=flat-square&logo=github)](https://github.com/cmliu/edgetunnel/network/members)
-[![License](https://img.shields.io/github/license/cmliu/edgetunnel?style=flat-square)](https://github.com/cmliu/edgetunnel/blob/main/LICENSE)
-[![Telegram](https://img.shields.io/badge/Telegram-Group-blue?style=flat-square&logo=telegram)](https://t.me/CMLiussss)
-[![YouTube](https://img.shields.io/badge/YouTube-Channel-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=LeT4jQUh8ok)
-[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat-square&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/cmliu/edgetunnel)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/cmliu/edgetunnel)
+一个运行在 Cloudflare Workers / Pages 上的 VLESS 代理。
 
----
+📦 **只想直接部署？** 从
+[Releases 页面](https://github.com/andrewfullstack/edgetunnel/releases)
+下载 `edgetunnel.zip`，并按照下方
+[Cloudflare Pages（zip 上传）](#cloudflare-pages-zip-上传--推荐--已测试)
+的步骤操作即可。
 
-## 📖 项目简介
+本项目是 [`cmliu/edgetunnel`](https://github.com/cmliu/edgetunnel) 的 TypeScript
+重构版本。上游项目是一个 4619 行的 `_worker.js`，使用中文标识符且没有任何
+测试；这个 fork 把它拆成了 37 个带类型的模块，配套 171 个单元测试和 9 个集
+成测试，同时保留了运行时与 KV schema 的兼容性，便于现有部署无缝升级。
 
-**edgetunnel** 是一个基于 CF Workers/Pages 平台的边缘计算隧道解密方案。它能够高效地处理网络流量，并提供强大的管理面板和灵活的节点配置能力。
+最终交付物仍是单个 `_worker.js`（压缩后约 80 KB）。
 
-- 🖥️ **Demo 演示站点**：[https://EDT-Pages.github.io/admin](https://EDT-Pages.github.io/admin)
+## 项目范围
 
----
+- **VLESS** over WebSocket / XHTTP / gRPC。Cloudflare 边缘负责入站 TLS；
+  本代码负责解析 VLESS 帧并转发流量。
+- **管理面板**（`/admin`），基于 KV 的配置、日志查看、流量统计、运行时
+  配置校验。
+- **订阅生成器**（`/sub`），支持 Clash、Sing-box、Surge、Quantumult X、
+  Loon、mihomo 等，服务端缓存 5 分钟以减少客户端刷新洪峰带来的 CPU 压力。
+- **上游链路**：直连、ProxyIP、SOCKS5、HTTP CONNECT。
+- **自动迁移**老版本中文键名的 KV 配置。
 
-## 🧭 Why This Fork
+## 不在范围内的内容
 
-[The upstream project `cmliu/edgetunnel`](https://github.com/cmliu/edgetunnel) is a brilliant Cloudflare Workers edge-proxy implementation — **a great idea, but very hard to maintain**:
+完整说明见 [`docs/PLATFORM_LIMITS.md`](./docs/PLATFORM_LIMITS.md)。简述如下：
 
-- All logic is crammed into a single 4619-line `_worker.js` file
-- Variables and functions are heavily named in Chinese (`反代IP`, `处理WS请求`, `解析木马请求`, …)
-- Zero TypeScript types
-- Zero test coverage
+- Shadowsocks 和 Trojan 支持 — 已移除；VLESS 已能覆盖相同场景
+- HTTPS 上游代理模式 — 已与手写 TLS 客户端一并移除
+- 基于 UDP 的协议（Hysteria2、TUIC）— Workers 没有 UDP API
+- REALITY — Workers 无法终止入站 TLS
+- 多租户账号 — 在收到需求前暂不支持
 
-This makes it extremely hard for anyone to fix a bug, add a feature, or simply **figure out what a block of code is doing**. The contribution barrier is high, and in practice the project is maintained almost single-handedly by the original author.
+如果你需要上述任何功能，请改在 VPS 上运行
+[Xray-core](https://github.com/XTLS/Xray-core) 或
+[sing-box](https://github.com/SagerNet/sing-box)。在那种环境下它们是更合适
+的工具。
 
-The goals of this fork are straightforward:
+## 部署
 
-1. **Split the single file into 51 well-scoped TypeScript modules** (`src/crypto/`, `src/protocols/`, `src/transports/`, `src/handlers/`, …)
-2. **Translate every Chinese identifier to English** — with transparent migration for existing KV configs, so users upgrading from the original version get their config schema upgraded automatically with no manual steps
-3. **Add full TypeScript types + a Vitest test suite** (24 files, 227 tests, covering RFC 8439 and FIPS 180-4 reference vectors)
-4. **Preserve runtime behaviour and deployment shape** — the built `_worker.js` is still a single esbuild bundle and is a drop-in replacement for the upstream version
+你需要一个 Cloudflare 账号和一个域名（接入 Cloudflare DNS 即可，免费版也可以）。
 
-The hope is to lower the maintenance bar for this excellent project so that more people can read it, modify it, and contribute back. If you share that goal, PRs, issues, and forks-of-this-fork are all very welcome.
+### Cloudflare Pages（zip 上传） — 推荐 ✅ 已测试
 
-### ✨ 核心特性
+最稳妥的路径 — Workers 控制台的"粘贴部署"有时会把项目错判为纯静态资源
+项目，进而拒绝你添加环境变量。Pages 没有这个问题。
 
-- 🛡️ **协议支持**：支持 VLESS、Trojan、Shadowsocks 等主流协议，深度集成加密传输。
-- 📊 **管理面板**：内置可视化后台，支持实时配置修改、日志查看及流量统计。
-- 🛠️ **部署灵活**：完整适配 CF Workers 及 CF Pages (GitHub / 上传)。
-- 🔄 **订阅系统**：内置自动订阅生成及混淆转换，适配主流客户端（Clash, Sing-box, Surge 等）。
-- ⚡ **性能加速**：支持自定义 ProxyIP、SOCKS5/HTTP 链式代理及优选 API，优化网络延迟。
-- 🌐 **多台适配**：完美适配 Windows, Android, iOS, MacOS 及各种软路由固件。
+1. **获取 `edgetunnel.zip`。** 二选一：
+   - 从 [Releases 页面](https://github.com/andrewfullstack/edgetunnel/releases)
+     下载（推荐 — 每个 tag 都由 CI 构建、测试、签名），或者
+   - 本地构建：`npm run build && zip edgetunnel.zip _worker.js`。
 
----
+   两种方式得到的 zip 都只在根目录包含一个 `_worker.js`（约 80 KB）。
+   **不要使用上游 `cmliu/edgetunnel` 的压缩包 — 它里面的 `_worker.js`
+   是重构前那份原始的 4619 行文件，与本 fork 文档描述的不一致。**
+2. **Pages 控制台 → 创建 → Pages 选项卡 → 上传资产** → 给项目命名 →
+   上传 zip → **部署站点**。
+3. **设置 → 环境变量 → 生产** → 添加 `ADMIN` = 你的管理员密码 →
+   **保存**。
+4. 返回 **部署** → **创建新部署** → 重新上传同一个 zip → **保存并部
+   署**。（这一步是必需的，让环境变量在运行中的部署里生效。）
+5. **设置 → 绑定 → KV 命名空间** → 添加绑定，变量名填 `KV` → 保存 →
+   再重新部署一次。
+6. **自定义域** → 绑定一个 CNAME 子域名（注意：不要用根域，要用类似
+   `vless.your-domain.com` 的子域名）。
+7. 访问 `https://<你的子域名>/admin`，使用 `ADMIN` 登录。
 
-## 💡 快速部署
->[!TIP]
-> 📖 **详尽图文教程**：[edgetunnel 部署指南](https://cmliussss.com/p/edt2/)
+### Cloudflare Pages（GitHub 连接）
 
->[!WARNING]
-> ⚠️ **Error 1101问题**：[视频解析](https://www.youtube.com/watch?v=r4uVTEJptdE)
+1. Fork 本仓库。
+2. **Pages → 连接到 Git** → 选择你的 fork → 设置 `ADMIN` 环境变量。
+3. 按上面的步骤添加 KV 绑定与自定义域名。
 
-### ⚙️ Workers 部署
+### Cloudflare Workers（通过 wrangler CLI 部署）
 
-<details>
-<summary><code><strong>「 Workers 部署文字教程 」</strong></code></summary>
-
-1. 部署 CF Worker：
-   - 在 CF Worker 控制台中创建一个新的 Worker。
-   - 将 [_worker.js](https://github.com/andrewfullstack/edgetunnel/blob/main/_worker.js) 的内容粘贴到 Worker 编辑器中。
-   - 在左侧的 `设置`选项卡中，选择 `变量` > `添加变量`。
-     变量名称填写**ADMIN**，值则为你的管理员密码，后点击 `保存`即可。
-
-2. 绑定 KV 命名空间：
-   - 在 `绑定`选项卡中选择 `添加绑定 +` > `KV 命名空间` > `添加绑定`，然后选择一个已有的命名空间或创建一个新的命名空间进行绑定。
-   - `变量名称`填写**KV**，然后点击 `添加绑定`即可。
-
-3. 给 Workers绑定 自定义域： 
-   - 在 workers控制台的 `触发器`选项卡，下方点击 `添加自定义域`。
-   - 填入你已转入 CF 域名解析服务的次级域名，例如:`vless.google.com`后 点击`添加自定义域`，等待证书生效即可。
-
-4. 访问后台：
-   - 访问 `https://vless.google.com/admin` 输入管理员密码即可登录后台。
-
-</details>
-
-### 🛠 Pages 上传 部署方法 **最佳推荐!!!** [图文教程](https://cmliussss.com/p/edt2/)
-
-<details>
-<summary><code><strong>「 Pages 上传文件部署文字教程 」</strong></code></summary>
-
-1. 部署 CF Pages：
-   - 下载 [main.zip](https://github.com/andrewfullstack/edgetunnel/archive/refs/heads/main.zip) 文件，并点上 Star !!!
-   - 在 CF Pages 控制台中选择 `上传资产`后，为你的项目取名后点击 `创建项目`，然后上传你下载好的 [main.zip](https://github.com/andrewfullstack/edgetunnel/archive/refs/heads/main.zip) 文件后点击 `部署站点`。
-   - 部署完成后点击 `继续处理站点` 后，选择 `设置` > `环境变量` > **制作**为生产环境定义变量 > `添加变量`。
-     变量名称填写**ADMIN**，值则为你的管理员密码，后点击 `保存`即可。
-   - 返回 `部署` 选项卡，在右下角点击 `创建新部署` 后，重新上传 [main.zip](https://github.com/andrewfullstack/edgetunnel/archive/refs/heads/main.zip) 文件后点击 `保存并部署` 即可。
-
-2. 绑定 KV 命名空间：
-   - 在 `设置`选项卡中选择 `绑定` > `+ 添加` > `KV 命名空间`，然后选择一个已有的命名空间或创建一个新的命名空间进行绑定。
-   - `变量名称`填写**KV**，然后点击 `保存`后重试部署即可。
-
-3. 给 Pages绑定 CNAME自定义域：[视频教程](https://www.youtube.com/watch?v=LeT4jQUh8ok&t=851s)
-   - 在 Pages控制台的 `自定义域`选项卡，下方点击 `设置自定义域`。
-   - 填入你的自定义次级域名，注意不要使用你的根域名，例如：
-     您分配到的域名是 `fuck.cloudns.biz`，则添加自定义域填入 `lizi.fuck.cloudns.biz`即可；
-   - 按照 CF 的要求将返回你的域名DNS服务商，添加 该自定义域 `lizi`的 CNAME记录 `edgetunnel.pages.dev` 后，点击 `激活域`即可。
-   
-4. 访问后台：
-   - 访问 `https://lizi.fuck.cloudns.biz/admin` 输入管理员密码即可登录后台。
-
-</details>
-
-### 🛠 Pages + GitHub 部署方法
-
-<details>
-<summary><code><strong>「 Pages + GitHub 部署文字教程 」</strong></code></summary>
-
-1. 部署 CF Pages：
-   - 在 Github 上先 Fork 本项目，并点上 Star !!!
-   - 在 CF Pages 控制台中选择 `连接到 Git`后，选中 `edgetunnel`项目后点击 `开始设置`。
-   - 在 `设置构建和部署`页面下方，选择 `环境变量（高级）`后并 `添加变量`
-     变量名称填写**ADMIN**，值则为你的管理员密码，后点击 `保存并部署`即可。
-
-2. 绑定 KV 命名空间：
-   - 在 `设置`选项卡中选择 `绑定` > `+ 添加` > `KV 命名空间`，然后选择一个已有的命名空间或创建一个新的命名空间进行绑定。
-   - `变量名称`填写**KV**，然后点击 `保存`后重试部署即可。
-
-3. 给 Pages绑定 CNAME自定义域：[视频教程](https://www.youtube.com/watch?v=LeT4jQUh8ok&t=851s)
-   - 在 Pages控制台的 `自定义域`选项卡，下方点击 `设置自定义域`。
-   - 填入你的自定义次级域名，注意不要使用你的根域名，例如：
-     您分配到的域名是 `fuck.cloudns.biz`，则添加自定义域填入 `lizi.fuck.cloudns.biz`即可；
-   - 按照 CF 的要求将返回你的域名DNS服务商，添加 该自定义域 `lizi`的 CNAME记录 `edgetunnel.pages.dev` 后，点击 `激活域`即可。
-
-4. 访问后台：
-   - 访问 `https://lizi.fuck.cloudns.biz/admin` 输入管理员密码即可登录后台。
-
-</details>
-
----
-
-## 🧑‍💻 本地开发与构建
-
-> 项目已重构为模块化 TypeScript。`_worker.js` 现在是 **esbuild 打包+压缩产物**（约 77 KB，VLESS-only），由 `src/**/*.ts` 构建生成。原始单文件保存在初始提交里（`git show <initial-commit>:_worker.original.js`），需要 diff 时随时可取。
->
-> Architecture, schema migration, and rename map: see [`REFACTORING.md`](./REFACTORING.md).
-> Platform limits ("why no Hysteria2 / REALITY / multi-tenant", account-suspension risk, etc.): see [`docs/PLATFORM_LIMITS.md`](./docs/PLATFORM_LIMITS.md).
-
-### 环境要求
-
-- Node.js 18+
-- 仅在源码改动后需要构建；想直接部署的用户可以**继续直接使用 `_worker.js`**（仓库根目录已包含构建好的产物），完全沿用上游的部署流程。
-
-### 常用命令
+最稳妥的 Workers 部署方式；可以避开控制台的静态资产分类陷阱。
 
 ```bash
-npm install      # 安装依赖
-npm run lint     # tsc --noEmit （TypeScript 类型检查）
-npm test         # vitest run （24 个文件、227 个测试）
-npm run build    # esbuild 打包到 _worker.js
-npm run deploy   # build + wrangler deploy
+npm install
+npx wrangler login
+npx wrangler secret put ADMIN          # 粘贴你的管理员密码
+npx wrangler kv namespace create KV    # 记下输出里的 id
+# 在 wrangler.toml 中添加 KV 绑定：
+#   [[kv_namespaces]]
+#   binding = "KV"
+#   id = "<上面 create 输出的 id>"
+npm run deploy
 ```
 
-### 项目布局速览
+接着在 Cloudflare 控制台的 **触发器 → 自定义域** 给 worker 绑定一个自定
+义域名。
+
+### Cloudflare Workers（控制台粘贴） — 见警告
+
+> ⚠️ Cloudflare 新版控制台有时会把粘贴部署的 Worker 归类为"仅静态资
+> 产"，然后拒绝让你添加环境变量（错误信息：*"Variables cannot be added
+> to a Worker that only has static assets"*）。如果遇到这种情况，**删
+> 掉这个 Worker，改用上面任一方式重新部署**。
+
+1. **Workers & Pages → 创建 → Workers 选项卡 → Hello World 模板 →
+   部署。**（不要用其他"创建"路径 — 它们可能把代码当作静态资产上传。）
+2. 打开 Worker → **编辑代码** → 把整段内容替换为
+   [`_worker.js`](./_worker.js) 的内容 → **保存并部署**。
+3. **设置 → 变量**：添加 `ADMIN` = 你的管理员密码。
+4. **设置 → 绑定**：添加名为 `KV` 的 KV 命名空间。
+5. **触发器 → 自定义域**：绑定一个子域名。
+6. 访问 `https://<你的域名>/admin` 登录。
+
+### 验证部署
+
+在绑定自定义域并等 DNS 生效之后：
+
+1. **`/admin`** 能正常打开 — 说明 Worker 在跑，并且 `ADMIN` 环境变量
+   已经接好。
+2. **`/admin/validation.json`** 返回 `{"ok": true, "count": 0}` — 说明
+   KV 绑定正确，没有 schema 问题。如果 `ok` 是 false，管理面板会同时
+   显示一条黄色横幅，列出对应问题。
+3. **订阅 URL** — 从管理面板复制，粘贴到客户端（Clash / Sing-box /
+   Surge），确认节点已出现。
+4. **真实连接** — 通过任一节点出网，访问 `https://ifconfig.me` 之类，
+   确认 IP 是 Cloudflare 的地址（说明流量真的过了 worker）。
+5. **`wrangler tail <project-name>`**（可选）— 实时打印部署后 worker
+   的 `console.log`。对那些客户端看不到的问题排查很有用。
+
+如果 `/admin` 显示黄色横幅（"⚠️ Config has N validation issues"），访
+问 `/admin/validation.json` 可以看到 KV 配置中所有出问题的字段；校验器
+会把不合法字段强制设回默认值并继续提供服务，所以即使你还没修，worker
+依然能用。
+
+## 配置
+
+### 环境变量
+
+| 名称 | 必填 | 示例 | 说明 |
+|---|:---:|---|---|
+| `ADMIN` | 是 | `mypassword` | 管理面板密码。用户 UUID 由它派生。 |
+| `KEY` | 否 | `mykey` | 快速订阅路径：访问 `/<KEY>` 可快速拉取节点。 |
+| `UUID` | 否 | `90cd4a77-...` | 强制使用固定 UUID。必须为 UUIDv4。 |
+| `PROXYIP` | 否 | `proxyip.example.net:443` | 默认反代 IP。 |
+| `URL` | 否 | `https://example.com` | 伪装首页 URL（也可填 `1101`）。 |
+| `GO2SOCKS5` | 否 | `*.example.com,*.foo.cn` | 强制走 SOCKS5 的主机名（`*` 表示全局）。 |
+| `DEBUG` | 否 | `1` | 开启 `console.log`。 |
+| `OFF_LOG` | 否 | `1` | 关闭访问日志。 |
+| `BEST_SUB` | 否 | `1` | 作为优选订阅生成器运行。 |
+
+### 基于路径的运行时配置
+
+worker 支持通过 URL 路径段切换上游代理：
 
 ```
-src/
-├── index.ts          ← 主 fetch handler 入口
-├── crypto/           ← 加密层 (ChaCha20-Poly1305 / SHA-224 / TLS 客户端 / ECDH …)
-├── protocols/        ← VLESS / Trojan / Shadowsocks / 缓冲式协议探测
-├── transports/       ← socket / udp / socks5 / http-connect / byob
-├── handlers/         ← /admin /sub /login + WebSocket / XHTTP / gRPC 数据面
-├── subscription/     ← Clash / Sing-box / Surge 订阅热补丁
-├── admin/            ← 配置加载、随机 IP、优选 API、Cloudflare 用量、伪装页
-└── utils/            ← 字节工具、DoH、日志、路径处理
-tests/                ← Vitest 单元测试 (227 个)
+/proxyip=proxyip.example.net
+/socks5=user:password@127.0.0.1:1080
+/socks5://user:password@127.0.0.1:1080      （全局 SOCKS5）
+/http=user:password@127.0.0.1:8080
+/http://user:password@127.0.0.1:8080         （全局 HTTP CONNECT）
 ```
 
-### KV 配置自动迁移
+上游里的 `/https=...` 与 `/https://...` 语法在本 fork 中**不再支持** —
+原因见 [`docs/PLATFORM_LIMITS.md`](./docs/PLATFORM_LIMITS.md)。
 
-旧版本的 `config.json` 字段名是中文（`协议类型`、`反代`、`优选订阅生成`…）。从旧版升级到当前版本时，`readConfigJson` 会**自动迁移**到新的英文 schema 并写回 KV，**用户无需手动操作**。
+### 轮换订阅 token / 节点 UUID
 
-### 构建产物兼容性说明
+订阅 token 与节点 UUID 由 `md5x2(ADMIN + KEY)` 派生。要轮换它们：
 
-构建产物 `_worker.js` 与原上游单文件具有**完全一致的运行时行为**：URL 路由、KV 数据 schema（迁移后）、请求/响应格式都保持兼容。可以直接上传到 Cloudflare Workers / Pages 替换原版本。
+- 修改 `ADMIN` 或 `KEY` → 两者一起轮换。
+- 显式设置 `UUID` 来固定 UUID（必须是合法的 UUIDv4）。
 
----
+## 客户端兼容性
 
-## 🔑 环境变量说明
+| 平台 | 推荐客户端 |
+|---|---|
+| Windows | v2rayN、FlClash、mihomo-party、Clash Verge Rev |
+| macOS | FlClash、mihomo-party、Clash Verge Rev、Surge |
+| iOS | Surge、Shadowrocket、Stash |
+| Android | ClashMetaForAndroid、FlClash、v2rayNG（建议使用 Meta 核心） |
 
-| 变量名 | 必填 | 示例 | 详细备注 |
-| :--- | :---: | :--- | :--- |
-| **ADMIN** | ✅ | `123456` | 后台管理面板登录密码 |
-| **KEY** | ❌ | `CMLiussss` | 快速订阅路径密钥，访问 `/CMLiussss` 即可快速获取节点 |
-| **UUID** | ❌ | `90cd4a77-141a-43c9-991b-08263cfe9c10` | 强制固定UUID，只支持**UUIDv4**标准格式 |
-| **PROXYIP** | ❌ | `proxyip.cmliussss.net:443` | 全局自定义反代 IP  |
-| **URL** | ❌ | `https://cloudflare-error-page-3th.pages.dev` | 默认主页伪装地址（可填写网页 URL 或 `1101`） |
-| **GO2SOCKS5** | ❌ | `blog.cmliussss.com`,`*.ip111.cn`,`*google.com` | 强制走 SOCKS5 的名单 (`*` 为全局，域名用逗号分隔) |
-| **DEBUG** | ❌ | `1`或`true` | **开发者模式**，默认关闭调试日志功能（console.log），设置`1`或`true`则开启调试日志功能 |
-| **OFF_LOG** | ❌ | `1`或`true` | 默认开启日志记录功能，设置`1`或`true`则关闭日志记录功能 |
-| **BEST_SUB** | ❌ | `1`或`true` | 默认关闭作为**优选订阅生成器**的功能，设置`1`或`true`则开启该功能 |
+## 本地开发
 
----
+需要 Node.js 20+。
 
-## 🔧 高级实用技巧
-如需修改 **订阅地址里的TOKEN** 和 **用于节点验证的UUID** ，可通过修改变量
-1. 修改`ADMIN`或`KEY`变量的值，可以随机修改 **订阅地址里的TOKEN** 和 **用于节点验证的UUID**
-2. 设置`UUID`变量可以强制固定 **订阅地址里的TOKEN** 和 **用于节点验证的UUID**，注意必须是**UUIDv4**标准格式，否则会导致节点无法使用。
+```bash
+npm install
+npm run lint              # tsc --noEmit
+npm test                  # vitest run（约 1 秒，171 个测试）
+npm run test:integration  # build + 基于 workerd 的端到端测试（约 5 秒）
+npm run build             # esbuild → _worker.js
+npm run analyze           # 按模块的打包体积细分
+npm run deploy            # build + wrangler deploy
+```
 
-本工具支持通过 **PATH路径** 动态切换底层代理方案：
+仓库中提交的 `_worker.js` 必须与从 `src/` 重新构建的产物一致。CI 通过
+漂移检查强制这一点；如果你修改了 `src/`，**务必重新构建并把生成的产
+物一并提交**。
 
-- 指定 `PROXYIP` 案例
-   ```url
-   /proxyip=proxyip.cmliussss.net
-   /?proxyip=proxyip.cmliussss.net
-   ```
+完整流程见 [`CONTRIBUTING.md`](./CONTRIBUTING.md)。
 
-- 指定 `SOCKS5` 案例
-   ```url
-   /socks5=user:password@127.0.0.1:1080
-   /?socks5=user:password@127.0.0.1:1080
-   /socks://dXNlcjpwYXNzd29yZA==@127.0.0.1:1080 (默认激活全局SOCKS5)
-   /socks5://user:password@127.0.0.1:1080 (默认激活全局SOCKS5)
-   ```
+## 文档
 
-- 指定 `HTTP代理` 案例
-   ```url
-   /http=user:password@127.0.0.1:1080
-   /http://user:password@127.0.0.1:8080 (默认激活全局SOCKS5)
-   ```
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — 如何提 PR
+- [`REFACTORING.md`](./REFACTORING.md) — 架构、schema 迁移、改名映射表
+- [`docs/PLATFORM_LIMITS.md`](./docs/PLATFORM_LIMITS.md) — 哪些功能不可用以及原因
 
----
+## 免责声明
 
-## 💻 客户端适配情况
-
-| 平台 | 推荐客户端 | 备注 |
-| :--- | :--- | :--- |
-| **Windows** | [v2rayN](https://github.com/2dust/v2rayN), [FlClash](https://github.com/chen08209/FlClash), [mihomo-party](https://github.com/mihomo-party-org/mihomo-party), [Clash Verge Rev](https://github.com/ClashVerge/ClashVerge-Rev) | 全面支持 |
-| **Android** | [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid), [FlClash](https://github.com/chen08209/FlClash), [v2rayNG](https://github.com/2dust/v2rayNG) | 建议使用 Meta 核心 |
-| **iOS** | [Surge](https://surgeapp.com/), [Shadowrocket](https://shadowrocket.com/), [Stash](https://stashapp.com/) | 完美适配 |
-| **MacOS** | [FlClash](https://github.com/chen08209/FlClash), [mihomo-party](https://github.com/mihomo-party-org/mihomo-party), [Clash Verge Rev](https://github.com/ClashVerge/ClashVerge-Rev), [Surge](https://surgeapp.com/) | M1/M2 完美兼容 |
-
----
-
-## ⭐ 项目热度
-
-[![Stargazers over time](https://starchart.cc/cmliu/edgetunnel.svg?variant=adaptive)](https://starchart.cc/cmliu/edgetunnel)
-
----
-
-## 🙏 特别鸣谢
-### 💖 赞助支持 - 提供云服务器维持[订阅转换服务](https://sub.cmliussss.net/)
-- [Alice](https://url.cmliussss.com/alice)
-- [EasyLinks](https://www.vmrack.net?ref_code=5Zk7eNhbgL7)
-- [ZMTO(VTEXS)](https://zmto.com/?affid=1532)
-
-### 🛠 开源代码引用
-- [zizifn/edgetunnel](https://github.com/zizifn/edgetunnel)
-- [3Kmfi6HP/EDtunnel](https://github.com/6Kmfi6HP/EDtunnel)
-- [SHIJS1999/cloudflare-worker-vless-ip](https://github.com/SHIJS1999/cloudflare-worker-vless-ip)
-- [Stanley-baby](https://github.com/Stanley-baby)
-- [ACL4SSR](https://github.com/ACL4SSR/ACL4SSR/tree/master/Clash/config)
-- [股神](https://t.me/CF_NAT/38889)
-- [Workers/Pages Metrics](https://t.me/zhetengsha/3382)
-- [白嫖哥](https://t.me/bestcfipas)
-- [Mingyu](https://github.com/ymyuuu/workers-vless)
-- [ToiCF/CF-Workers-HTTPS](https://github.com/ToiCF/CF-Workers-HTTPS)
-- [eooce](https://github.com/eooce/Cloudflare-proxy)
-- [Sukka](https://ip.skk.moe/)
-- [zhangtaile](https://github.com/cmliu/edgetunnel/pull/999)
-- [1345695](https://github.com/1345695/edcloudwasm)
-
----
-
-## ⚠️ 免责声明
-
-1. 本项目（"edgetunnel"）仅供**教育、科学研究及个人安全测试**之目的。
-2. 使用者在下载或使用本项目代码时，必须严格遵守所在地区的法律法规。
-3. 作者 **cmliu** 对任何滥用本项目代码导致的行为或后果均不承担任何责任。
-4. 本项目不对因使用代码引起的任何直接或间接损害负责。
-5. 建议在测试完成后 24 小时内删除本项目相关部署。
-
----
-
-**如果您觉得项目对您有帮助，请给一个 Star 🌟，这是对我最大的鼓励！**
+本项目仅供教育与个人安全测试用途。请遵守所在司法辖区的法律。维护者对
+任何滥用行为不承担责任。Cloudflare 的服务条款禁止把 Workers 当作"通用
+代理"使用 — 执行力度并不一致，但账号被封停的风险是真实存在的。请使
+用专门的 CF 账号，不要用你的主账号。详见 `docs/PLATFORM_LIMITS.md`。
